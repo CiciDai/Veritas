@@ -10,8 +10,7 @@ predictor_path = 'shape_predictor_68_face_landmarks.dat'
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor(predictor_path)
 
-# Start a socket listening for connections on 0.0.0.0:8000 (0.0.0.0 means
-# all interfaces)
+# Start a socket listening for connections on 0.0.0.0:8000
 server_socket = socket.socket()
 server_socket.bind(('0.0.0.0', 8000))
 server_socket.listen(0)
@@ -38,21 +37,6 @@ try:
         # processing on it
         image_stream.seek(0)
         img = np.asarray(Image.open(image_stream))
-        # print(img[0])
-        # print(img[0][0][0].dtype)
-        # print(img.dtype)
-		
-        # file_bytes = np.asarray(bytearray(image_stream.read()), dtype=np.uint8)
-        # img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-        # cv2.imshow("image", img)
-		
-        # print('Image is %dx%d' % image.size)
-
-        # image = np.zeros(img.shape)
-        # image[:, :, 0] = img[:, :, 0] / 255.0
-        # image[:, :, 1] = img[:, :, 1] / 255.0
-        # image[:, :, 2] = img[:, :, 2] / 255.0
-        # cv2.imshow("image", image)
         
         gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         if frame_count >= 3:
