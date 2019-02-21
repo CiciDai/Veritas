@@ -94,10 +94,13 @@ try:
 		# Rewind the stream, open it as an image with PIL and do some
 		# processing on it
 		image_stream.seek(0)
+		print("opening image!")
 		img = np.asarray(Image.open(image_stream))
 		
+		print("to gray")
 		gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 		if frame_count >= 3:
+			print("get faces")
 			faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 			#faces = detector(gray, 0)
 			frame_count = 0
@@ -164,6 +167,7 @@ try:
 		#        y = shape.part(i).y
 		#        cv2.circle(img, (x, y), 3, (0, 150, 255))
 		#        print("ran")
+		print("image stream reset")
 		image_stream.seek(0)
 		image_stream.truncate()
 		frame_count += 1
