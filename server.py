@@ -138,6 +138,10 @@ try:
 			for p in range(person):
 				print("for each person")
 				prediction = predicted_prob.argmax(axis=-1)[p]
+				conf_level = round(np.amax(predicted_prob[p]) * 100, 2)
+				result = "Unknown"
+				if conf_level > 40:
+					result = str(prediction) + ":" + str(conf_level) + "%"
 				print("get prediction")
 				#cv2.putText(frame, emotion[prediction], (left[p], top[p]-14),
 				#            cv2.FONT_HERSHEY_SIMPLEX, 1, (250, 250, 250), thickness=2)
@@ -146,9 +150,12 @@ try:
 				# cv2.imwrite(name, face[p] * 255)  # back to 0-255
 				
 				# send result over to client
+				if stringData == "Unknown" and result == "Unknown":
+					continue
+					
 				mutex.acquire()
 				print("acquired mutex!")
-				stringData = str(prediction)
+				stringData = result
 				print(stringData)
 				mutex.release()
 				print("released mutex!")
