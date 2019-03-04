@@ -19,7 +19,7 @@ from skimage import filters, feature
 
 
 # load frontal face detector
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+face_cascade = cv2.CascadeClassifier('lbpcascade_frontalface_improved.xml')
 
 # load model
 model = tf.keras.models.load_model("cnn_model216.h5")
@@ -30,17 +30,17 @@ model.compile(loss='sparse_categorical_crossentropy',
 			optimizer=tf.train.GradientDescentOptimizer(0.01),
 			metrics=['accuracy'])
 
-print(model.summary())
+#print(model.summary())
 	
 # load the labels for emotion
 emotion = ['neutral', 'anger', 'contempt', 'disgust', 'fear', 'happy', 'sadness', 'surprise']
 
+currentFrame = None
 
-def send_process(sock):
+def send_process(sock, endSend, resultQueue):
 	#send_connection = sock.makefile('wb')
 	counter = 0
 	while True:
-		print("send_process running")
 		if endSend is True:
 			print("end sending!")
 			sock.send(str("end_stream").encode())
@@ -48,19 +48,19 @@ def send_process(sock):
 		#global newInfo
 		#if newInfo is True:
 		if resultQueue.empty() is False:
-			print("resultQueue not empty")
 			#size = len(stringData)
 			#send_connection.write(struct.pack('<L', size))
 			#send_connection.flush()
 			#send_connection.write(stringData)
-			resultMutex.acquire()
-			sock.send(resultQueue.get().encode())
-			resultMutex.release()
-			print("sent frame " + str(counter) + " at time " + str(time.time()))
+			#resultMutex.acquire()
+			result = resultQueue.get()
+			sock.send(result.encode())
+			#resultMutex.release()
+			print("sent frame " + str(counter) + ": " + result + " at time = " + str(time.time()))
 			counter += 1
 			#newInfo = False
 	
-def assignJob(imgQueue, resultQueue, imgMutex, resultMutex, end):
+def assignJob(imgQueue, resultQueue, imgMutex, resultMutex, end, framesProcessed):
 	#while endSend is False or imgQueue.empty() is False:
 	while end.value == 0 or imgQueue.empty() is False:
 	#if imgQueue.empty() is False:
@@ -69,9 +69,10 @@ def assignJob(imgQueue, resultQueue, imgMutex, resultMutex, end):
 			imgMutex.release()
 		else:
 			img = imgQueue.get()
-			print("got an image to process")
 			imgMutex.release()
 			results = processImg(img)
+			print("processed frame " + str(framesProcessed.value) + " at time = " + str(time.time()))
+			framesProcessed.value += 1
 			resultMutex.acquire()
 			for result in results:
 				resultQueue.put(result)
@@ -79,12 +80,13 @@ def assignJob(imgQueue, resultQueue, imgMutex, resultMutex, end):
 	print(str(end.value) + " process assignJob ending")
 
 def processImg(img):
+	processStart = time.time()
 	gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 	#if frame_count >= 3:
 	#	faces = face_cascade.detectMultiScale(gray, 1.3, 5, minSize=(30,30))
 	#	#faces = detector(gray, 0)
 	#	frame_count = 0
-	faces = face_cascade.detectMultiScale(gray, 1.3, 5, minSize=(30,30))
+	faces = face_cascade.detectMultiScale(gray, 1.3, 5, minSize=(50,50))
 	
 	top = []
 	left = []
@@ -148,10 +150,18 @@ def processImg(img):
 			#resultMutex.release()
 			#print("released mutex!")
 			#newInfo = True
+	print("processing took " + str(time.time() - processStart) + "seconds.")
 	return results
 
 
-if __name__ == '__main__':
+def getCurrentFrame():
+	global currentFrame
+	return currentFrame
+
+	
+#if __name__ == '__main__':
+def start_server():
+	print("server starting")
 
 	newInfo = False
 	endSend = False
@@ -160,6 +170,7 @@ if __name__ == '__main__':
 	imgMutex = Lock()
 	resultQueue = Queue()
 	end = Value('i', 0)
+	framesProcessed = Value('i', 0)
 	resultMutex = Lock()
 
 
@@ -169,7 +180,7 @@ if __name__ == '__main__':
 
 	workerProcesses = []
 	for i in range(10):
-		workerProcesses.append(Process(target=assignJob, args=(imgQueue, resultQueue, imgMutex, resultMutex, end)))
+		workerProcesses.append(Process(target=assignJob, args=(imgQueue, resultQueue, imgMutex, resultMutex, end, framesProcessed)))
 		workerProcesses[i].start()
 		print("started workers")
 		
@@ -184,9 +195,9 @@ if __name__ == '__main__':
 	
 	# Start a client socket
 	client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	client_socket.connect(('10.18.233.18', 8001))
+	client_socket.connect(('10.0.0.116', 8001))
 	print("client connected!")
-	clientThread = threading.Thread(target=send_process, args=(client_socket,))
+	clientThread = threading.Thread(target=send_process, args=(client_socket, endSend, resultQueue))
 	clientThread.start()
 	
 	faces = []
@@ -202,7 +213,7 @@ if __name__ == '__main__':
 			if image_len == 0:
 				# tell client to end
 				print("rec'd 0 size end string")
-				#endSend = True
+				endSend = True
 				end.value = 1
 				break
 			# Construct a stream to hold the image data and read the image
@@ -216,6 +227,9 @@ if __name__ == '__main__':
 			# processing on it
 			image_stream.seek(0)
 			img = np.asarray(Image.open(image_stream))
+			
+			global currentFrame
+			currentFrame = img
 			
 			imgQueue.put(img)
 	
