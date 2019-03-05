@@ -22,7 +22,7 @@ from skimage import filters, feature
 face_cascade = cv2.CascadeClassifier('lbpcascade_frontalface_improved.xml')
 
 # load model
-model = tf.keras.models.load_model("cnn_model216.h5")
+model = tf.keras.models.load_model("all_model.h5")
 print("Loaded model from disk")
 
 # compile loaded model
@@ -80,6 +80,7 @@ def assignJob(imgQueue, resultQueue, imgMutex, resultMutex, end, framesProcessed
 	print(str(end.value) + " process assignJob ending")
 
 def processImg(img):
+	print("processing image")
 	processStart = time.time()
 	gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 	#if frame_count >= 3:
@@ -90,47 +91,85 @@ def processImg(img):
 	
 	top = []
 	left = []
-	results = []
+	frame_num = 6  # collect 10 frames to get average emotion
+	sequence = np.zeros((5, frame_num, 96, 96, 1))  # max five ppl for now
+	count_seq = [0, 0, 0, 0, 0]  # for five ppl
+	result = ["", "", "", "", ""]
 	# if there is face in frame
 	if type(faces) is np.ndarray:
 		print("face detected")
 		face = np.zeros((faces.shape[0], 96, 96))
-		print("face reshaped")
 		person = 0
 		for (x, y, w, h) in faces:
-			print("for person " + str(person))
+			print("for each person")
 			left.append(x)
 			top.append(y)
-			print("drawing cv2 rectangle")
+			#print("drawing cv2 rectangle")
 			#cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 255, 255), 2)
 			if w > h:
 				s = w
 			else:
 				s = h
-			print("cropping")
 			crop = gray[y:y+s, x:x+s]
-			print("resizing")
+			#gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+			#face[person] = cv2.resize(gray, (96, 96))
 			face[person] = cv2.resize(crop, (96, 96))
 			person += 1
 
 		print("reshaping")
 		# reshape face numpy into the shape of trained data
 		face = face[:, :, :, np.newaxis]
-		face = (face / 255.).astype(np.float32)
+		#face = (face / 255.).astype(np.float32)
 		# detect whether the image contains one of the seven emotions
 		# using the trained model
-		print("making prediction!")
-		predicted_prob = model.predict(face)
+		
+		predictable = False
+		# add frame of everyone in their sequence
+		for p in range(person):
+			curr_frame = count_seq[p]
+			if curr_frame < frame_num:  # if this sequence is not full
+				# add frame of this person to this sequence
+				sequence[p][curr_frame] = face[p]
+				count_seq[p] += 1
+			else:
+				predictable = True
+				count_seq[p] = 0
+		
+		if predictable:
+			# detect whether the image contains one of the seven emotions
+			# using the trained model
+			exist_sequence = sequence[0: person]  # get only filled sequence
+			# label everyone in frame
+			for p in range(person):
+				predicted_prob = model.predict(exist_sequence[p])  # predict this person
+				predictions = predicted_prob.argmax(axis=-1)
+				# get most common emotion
+				counts = np.bincount(predictions)
+				most_common = counts.argmax()
+				# get average conf level of most common emotion
+				avg_conf = 0
+				for prob in predicted_prob:
+					avg_conf += prob[most_common]
+				avg_conf /= float(frame_num)
+				conf_level = round(avg_conf * 100, 2)
+				# update result
+				result[p] = "8::"
+				if conf_level > 20:
+					result[p] = str(most_common) + ":" + str(conf_level) + "%:"
+		
+		
+		#print("making prediction!")
+		#predicted_prob = model.predict(face)
 		
 		# label everyone in frame
-		for p in range(person):
-			print("for each person")
-			prediction = predicted_prob.argmax(axis=-1)[p]
-			conf_level = round(np.amax(predicted_prob[p]) * 100, 2)
-			result = "8::"
-			if conf_level > 40:
-				result = str(prediction) + ":" + str(conf_level) + "%:"
-			print("get prediction")
+		#for p in range(person):
+		#	print("for each person")
+		#	prediction = predicted_prob.argmax(axis=-1)[p]
+		#	conf_level = round(np.amax(predicted_prob[p]) * 100, 2)
+		#	result = "8::"
+		#	if conf_level > 40:
+		#		result = str(prediction) + ":" + str(conf_level) + "%:"
+		#	print("get prediction")
 			#cv2.putText(frame, emotion[prediction], (left[p], top[p]-14),
 			#            cv2.FONT_HERSHEY_SIMPLEX, 1, (250, 250, 250), thickness=2)
 			# save photo of this person's emotion
@@ -145,13 +184,14 @@ def processImg(img):
 			#resultMutex.acquire()
 			#print("acquired mutex!")
 			#resultQueue.put(result)
-			print(result)
-			results.append(result)
+		for p in range(person):
+			print(result[p])
+			#results.append(result[p])
 			#resultMutex.release()
 			#print("released mutex!")
 			#newInfo = True
 	print("processing took " + str(time.time() - processStart) + "seconds.")
-	return results
+	return result
 
 
 def getCurrentFrame():
@@ -195,7 +235,7 @@ def start_server():
 	
 	# Start a client socket
 	client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	client_socket.connect(('10.0.0.116', 8001))
+	client_socket.connect(('10.19.64.182', 8001))
 	print("client connected!")
 	clientThread = threading.Thread(target=send_process, args=(client_socket, endSend, resultQueue))
 	clientThread.start()
@@ -227,11 +267,10 @@ def start_server():
 			# processing on it
 			image_stream.seek(0)
 			img = np.asarray(Image.open(image_stream))
+			imgQueue.put(img)
 			
 			global currentFrame
-			currentFrame = img
-			
-			imgQueue.put(img)
+			currentFrame = img[:,:,::-1]
 	
 			#for _, d in enumerate(faces):
 			#    # d is array of two corner coordinates for face bounding box
