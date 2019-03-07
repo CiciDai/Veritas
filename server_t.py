@@ -36,6 +36,7 @@ model.compile(loss='sparse_categorical_crossentropy',
 emotion = ['neutral', 'anger', 'contempt', 'disgust', 'fear', 'happy', 'sadness', 'surprise']
 
 currentFrame = None
+circBuffer = np.zeros((30,), dtype=int)
 
 def send_process(sock, endSend, resultQueue):
 	#send_connection = sock.makefile('wb')
@@ -54,58 +55,52 @@ def send_process(sock, endSend, resultQueue):
 			#send_connection.write(stringData)
 			#resultMutex.acquire()
 			result = resultQueue.get()
+			global circBuffer
+			circBuffer = np.roll(circBuffer, 1)
+			circBuffer[29] = int(result.split(':')[0])
+			print(circBuffer)
 			sock.send(result.encode())
 			#resultMutex.release()
 			print("sent frame " + str(counter) + ": " + result + " at time = " + str(time.time()))
 			counter += 1
 			#newInfo = False
 	
-def assignJob(imgQueue, resultQueue, imgMutex, resultMutex, end, framesProcessed):
+def assignJob(imgQueue, resultQueue, imgMutex, faceQueue, end, framesProcessed, counterMutex):
 	#while endSend is False or imgQueue.empty() is False:
 	while end.value == 0 or imgQueue.empty() is False:
 	#if imgQueue.empty() is False:
+		
 		imgMutex.acquire()
 		if imgQueue.empty() is True:
 			imgMutex.release()
 		else:
 			img = imgQueue.get()
 			imgMutex.release()
-			results = processImg(img)
+			face = processImg(img)
 			print("processed frame " + str(framesProcessed.value) + " at time = " + str(time.time()))
+			if face is not None:
+				faceQueue.put(face)
 			framesProcessed.value += 1
-			resultMutex.acquire()
-			for result in results:
-				resultQueue.put(result)
-			resultMutex.release()
+			while framesProcessed.value >= 5:
+				continue
+				
 	print(str(end.value) + " process assignJob ending")
 
 def processImg(img):
 	print("processing image")
 	processStart = time.time()
 	gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-	#if frame_count >= 3:
-	#	faces = face_cascade.detectMultiScale(gray, 1.3, 5, minSize=(30,30))
-	#	#faces = detector(gray, 0)
-	#	frame_count = 0
 	faces = face_cascade.detectMultiScale(gray, 1.3, 5, minSize=(50,50))
 	
-	top = []
-	left = []
-	frame_num = 6  # collect 10 frames to get average emotion
-	sequence = np.zeros((5, frame_num, 96, 96, 1))  # max five ppl for now
-	count_seq = [0, 0, 0, 0, 0]  # for five ppl
-	result = ["", "", "", "", ""]
 	# if there is face in frame
 	if type(faces) is np.ndarray:
-		print("face detected")
-		face = np.zeros((faces.shape[0], 96, 96))
-		person = 0
+		face = np.zeros((96, 96))
+		max_area = 0
 		for (x, y, w, h) in faces:
-			print("for each person")
-			left.append(x)
-			top.append(y)
-			#print("drawing cv2 rectangle")
-			#cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 255, 255), 2)
+			if max_area >= (w * h):
+				continue
+			
+			max_area = w * h
 			if w > h:
 				s = w
 			else:
@@ -113,49 +108,16 @@ def processImg(img):
 			crop = gray[y:y+s, x:x+s]
 			#gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
 			#face[person] = cv2.resize(gray, (96, 96))
-			face[person] = cv2.resize(crop, (96, 96))
-			person += 1
+			face = cv2.resize(crop, (96, 96))
 
-		print("reshaping")
 		# reshape face numpy into the shape of trained data
-		face = face[:, :, :, np.newaxis]
+		face = face[:, :, np.newaxis]
+		
 		#face = (face / 255.).astype(np.float32)
 		# detect whether the image contains one of the seven emotions
 		# using the trained model
 		
-		predictable = False
-		# add frame of everyone in their sequence
-		for p in range(person):
-			curr_frame = count_seq[p]
-			if curr_frame < frame_num:  # if this sequence is not full
-				# add frame of this person to this sequence
-				sequence[p][curr_frame] = face[p]
-				count_seq[p] += 1
-			else:
-				predictable = True
-				count_seq[p] = 0
-		
-		if predictable:
-			# detect whether the image contains one of the seven emotions
-			# using the trained model
-			exist_sequence = sequence[0: person]  # get only filled sequence
-			# label everyone in frame
-			for p in range(person):
-				predicted_prob = model.predict(exist_sequence[p])  # predict this person
-				predictions = predicted_prob.argmax(axis=-1)
-				# get most common emotion
-				counts = np.bincount(predictions)
-				most_common = counts.argmax()
-				# get average conf level of most common emotion
-				avg_conf = 0
-				for prob in predicted_prob:
-					avg_conf += prob[most_common]
-				avg_conf /= float(frame_num)
-				conf_level = round(avg_conf * 100, 2)
-				# update result
-				result[p] = "8::"
-				if conf_level > 20:
-					result[p] = str(most_common) + ":" + str(conf_level) + "%:"
+		#faceQueue.put(face)
 		
 		
 		#print("making prediction!")
@@ -184,34 +146,70 @@ def processImg(img):
 			#resultMutex.acquire()
 			#print("acquired mutex!")
 			#resultQueue.put(result)
-		for p in range(person):
-			print(result[p])
+		#for p in range(person):
+		#	print(result[p])
 			#results.append(result[p])
 			#resultMutex.release()
 			#print("released mutex!")
 			#newInfo = True
-	print("processing took " + str(time.time() - processStart) + "seconds.")
-	return result
+		return face
+	#print("processing took " + str(time.time() - processStart) + "seconds.")
+	return None
 
-
-def getCurrentFrame():
-	global currentFrame
-	return currentFrame
+	
+def predictImg(faceQueue, resultQueue, framesProcessed, frame_num, end):
+	while end.value == 0 or faceQueue.empty() is False:
+		if framesProcessed.value >= 5:
+			faces = []
+			while faceQueue.empty() is False:
+				faces.append(faceQueue.get())
+			# detect whether the image contains one of the seven emotions
+			# using the trained model
+			# label everyone in frame
+			framesProcessed.value = 0
+			
+			if len(faces) == 0:
+				print("got empty faces list")
+				continue
+			
+			faces = np.array(faces)
+			
+			predicted_prob = model.predict(faces)  # predict
+			print("predicted_prob:")
+			print(predicted_prob)
+			predictions = predicted_prob.argmax(axis=-1)
+			# get most common emotion
+			counts = np.bincount(predictions)
+			most_common = counts.argmax()
+			# get average conf level of most common emotion
+			avg_conf = 0
+			for prob in predicted_prob:
+				avg_conf += prob[most_common]
+			avg_conf /= float(predicted_prob.shape[0])
+			conf_level = round(avg_conf * 100, 2)
+			# update result
+			result = "8::"
+			if conf_level > 20:
+				result = str(most_common) + ":" + str(conf_level) + "%:"
+			resultQueue.put(result)
+			print("prediction result: " + result)
 
 	
 #if __name__ == '__main__':
 def start_server():
 	print("server starting")
 
-	newInfo = False
+	#newInfo = False
 	endSend = False
 	stringData = None
 	imgQueue = Queue()
 	imgMutex = Lock()
+	faceQueue = Queue()
 	resultQueue = Queue()
 	end = Value('i', 0)
 	framesProcessed = Value('i', 0)
-	resultMutex = Lock()
+	counterMutex = Lock()
+	frame_num = 5
 
 
 	#predictor_path = 'shape_predictor_68_face_landmarks.dat'
@@ -219,11 +217,15 @@ def start_server():
 	#predictor = dlib.shape_predictor(predictor_path)
 
 	workerProcesses = []
-	for i in range(10):
-		workerProcesses.append(Process(target=assignJob, args=(imgQueue, resultQueue, imgMutex, resultMutex, end, framesProcessed)))
+	for i in range(frame_num):
+		workerProcesses.append(Process(target=assignJob, args=(imgQueue, resultQueue, imgMutex, faceQueue, end, framesProcessed, counterMutex)))
 		workerProcesses[i].start()
 		print("started workers")
 		
+	predictProcess = Process(target=predictImg, args=(faceQueue, resultQueue, framesProcessed, frame_num, end))
+	predictProcess.start()
+	print("started predict process")
+	
 	# Start a socket listening for connections on 0.0.0.0:8000
 	server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	server_socket.bind(('0.0.0.0', 8000))
@@ -235,7 +237,7 @@ def start_server():
 	
 	# Start a client socket
 	client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	client_socket.connect(('10.19.64.182', 8001))
+	client_socket.connect(('10.0.0.116', 8001))
 	print("client connected!")
 	clientThread = threading.Thread(target=send_process, args=(client_socket, endSend, resultQueue))
 	clientThread.start()
@@ -259,9 +261,9 @@ def start_server():
 			# Construct a stream to hold the image data and read the image
 			# data from the recv_connection
 			
-			print("receiving data!")
+			#print("receiving data!")
 			image_stream.write(recv_connection.read(image_len))
-			print("received frame #" + str(count) + " at time = " + str(time.time()))
+			#print("received frame #" + str(count) + " at time = " + str(time.time()))
 			count += 1
 			# Rewind the stream, open it as an image with PIL and do some
 			# processing on it
@@ -293,6 +295,7 @@ def start_server():
 	finally:
 		for worker in workerProcesses:
 			worker.join()
+		predictProcess.join()
 		clientThread.join()
 		recv_connection.close()
 		server_socket.close()
