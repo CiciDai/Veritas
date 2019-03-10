@@ -110,4 +110,7 @@ def read_label(all_labels_path, subj, seq):
 def save_out_data(path, X, y):
     if not os.path.exists(path):
         os.makedirs(path)
-    numpy.savez_compressed(os.path.join(path, 'XY96_34.npz'), x=X, y=y)
+    npz_name = input("Give compressed file a name: ")
+    npz_name = "XY_CKP_" + npz_name +".npz"
+    numpy.savez_compressed(os.path.join(path, npz_name), x=X, y=y)
+    print(X.shape[0], "data saved to", npz_name, "!")
