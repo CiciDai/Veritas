@@ -1,5 +1,5 @@
 # Ying Zheng
-# TECHIN 510
+# TECHIN 514
 # 3-4-2019
 # This classifier detects emotions from camera using trained classifier
 # and display the detected emotions on the image
