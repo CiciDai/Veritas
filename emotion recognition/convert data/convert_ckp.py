@@ -17,8 +17,6 @@ for a in all_img:
 num_samples = len(all_img)
 print(num_samples)
 
-X, y= make_data_label_mats(image_path, label_path, num_samples)
-
 def make_data_label_mats(all_images_path, all_labels_path, num_samples):
     # Initialize the data of interest
     image_shape = (96, 96, 1)
@@ -114,3 +112,6 @@ def save_out_data(path, X, y):
     npz_name = "XY_CKP_" + npz_name +".npz"
     numpy.savez_compressed(os.path.join(path, npz_name), x=X, y=y)
     print(X.shape[0], "data saved to", npz_name, "!")
+    
+X, y= make_data_label_mats(image_path, label_path, num_samples)
+save_out_data(save_path, X, y)
