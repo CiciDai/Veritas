@@ -6,7 +6,7 @@ import imageio  # TODO: install this to save gif
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
 sampleNum = 0
-person = "G005"  # Cici: G001, Ao: G002, Ying: G003, Steven: G004, Ying at home: G005
+person = "G005"
 path = os.getcwd()
 
 # make person folder
