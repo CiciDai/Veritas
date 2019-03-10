@@ -4,7 +4,7 @@ save_path = "/npy"
 image_path = os.path.join(path, 'cohn-kanade-images')
 label_path = os.path.join(path, 'Emotion_labels')
 
-print '\nSaving CK+ images and labels to .npy files.'
+print '\nSaving CK+ images and labels to .npz file.'
 
 # Get number of images
 types = ('*.png', '*.jpg')
