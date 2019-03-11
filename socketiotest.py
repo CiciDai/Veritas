@@ -1,22 +1,25 @@
 from flask import Flask, render_template, Response
-import server_t
+from flask_socketio import SocketIO, emit
 import threading
 import cv2
 import time
 import numpy as np
 
 app = Flask(__name__)
+#app.config['SECRET_KEY'] = 'veritas'
+#socketio = SocketIO(app)
 
 
 @app.route('/')
 def index():
 	return render_template('index.html')
 
-
+	
 def gen():
 	while True:
 		start = time.time()
-		frame = server_t.currentFrame
+		#frame = server_t.currentFrame
+		frame = None
 		if frame is not None:
 			success, encoded_image = cv2.imencode('.jpg', frame)
 			content = encoded_image.tobytes()
@@ -31,11 +34,16 @@ def video_feed():
 	return Response(gen(), mimetype='multipart/x-mixed-replace; boundary=frame')
 	
 
+@app.route('/', methods= ['GET'])
+def stuff():
+	print("dostuff called")
+	return jsonify(neutral="10", anger="70", contempt="20", disgust="45", fear="12", happy="60", sadness="5", surprise="75")
+	
+	
 #def updateGraph():
 #	counts = np.bincount(server_t.circBuffer)
 	
 	
 if __name__ == '__main__':
-	server = threading.Thread(target=server_t.start_server)
-	server.start()
 	app.run(host='0.0.0.0')
+	#socketio.run(app)

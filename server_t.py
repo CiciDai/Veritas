@@ -38,6 +38,32 @@ emotion = ['neutral', 'anger', 'contempt', 'disgust', 'fear', 'happy', 'sadness'
 currentFrame = None
 circBuffer = np.zeros((30,), dtype=int)
 
+
+contrastMatrix = [[0.0, 0.7, 0.7, 0.7, 0.7, 0.6, 0.6, 0.7, 0.4],
+					[0.4, 0.0, 0.3, 0.3, 0.4, 0.7, 0.6, 0.6, 0.7],
+					[0.3, 0.3, 0.0, 0.3, 0.5, 0.7, 0.6, 0.5, 0.5],
+					[0.5, 0.3, 0.3, 0.0, 0.4, 0.7, 0.6, 0.4, 0.6],
+					[0.6, 0.6, 0.4, 0.5, 0.0, 0.7, 0.6, 0.5, 0.5],
+					[0.5, 0.8, 0.8, 0.7, 0.7, 0.0, 0.7, 0.3, 0.6],
+					[0.5, 0.6, 0.6, 0.5, 0.4, 0.8, 0.0, 0.5, 0.5],
+					[0.7, 0.4, 0.7, 0.3, 0.4, 0.3, 0.3, 0.0, 0.6],
+					[0.4, 0.5, 0.5, 0.7, 0.7, 0.5, 0.5, 0.6, 0.0]]
+
+
+#def predictSpeech():
+#	#TODO load model here (how?)	
+#	predictLies(emotion)
+
+
+#def predictLies(emotion):
+#	total = 0
+#	for i in range(len(circBuffer)):
+#		total += contrastMatrix[emotion][circBuffer[i]]
+#	total /= len(circBuffer)
+#	if total > 0.6:
+#		print("lie detected")
+
+
 def send_process(sock, endSend, resultQueue):
 	#send_connection = sock.makefile('wb')
 	counter = 0
@@ -89,8 +115,7 @@ def assignJob(imgQueue, resultQueue, imgMutex, faceQueue, end, framesProcessed, 
 def processImg(img):
 	print("processing image")
 	processStart = time.time()
-	gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-	faces = face_cascade.detectMultiScale(gray, 1.3, 5, minSize=(50,50))
+	faces = face_cascade.detectMultiScale(img, 1.3, 5, minSize=(50,50))
 	
 	# if there is face in frame
 	if type(faces) is np.ndarray:
@@ -105,10 +130,11 @@ def processImg(img):
 				s = w
 			else:
 				s = h
-			crop = gray[y:y+s, x:x+s]
+			crop = img[y:y+s, x:x+s]
+			gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
 			#gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
 			#face[person] = cv2.resize(gray, (96, 96))
-			face = cv2.resize(crop, (96, 96))
+			face = cv2.resize(gray, (96, 96))
 
 		# reshape face numpy into the shape of trained data
 		face = face[:, :, np.newaxis]
@@ -160,9 +186,9 @@ def processImg(img):
 def predictImg(faceQueue, resultQueue, framesProcessed, frame_num, end):
 	while end.value == 0:
 		if faceQueue.qsize() >= frame_num:
-			faces = []
+			faces = np.zeros((frame_num, 96, 96, 1))
 			for i in range(frame_num):
-				faces.append(faceQueue.get())
+				faces[i] = faceQueue.get()
 			#while faceQueue.empty() is False:
 			#faces.append(faceQueue.get())
 			
@@ -175,7 +201,7 @@ def predictImg(faceQueue, resultQueue, framesProcessed, frame_num, end):
 				print("got empty faces list")
 				continue
 			
-			faces = np.array(faces)
+			#faces = np.array(faces)
 			
 			predicted_prob = model.predict(faces)  # predict
 			print("predicted_prob:")
@@ -195,7 +221,7 @@ def predictImg(faceQueue, resultQueue, framesProcessed, frame_num, end):
 			if conf_level > 20:
 				result = str(most_common) + ":" + str(conf_level) + "%:"
 			resultQueue.put(result)
-			print("prediction result: " + result)
+			print("prediction result: " + emotion[most_common])
 	print("predictImg thread ending")
 	
 #if __name__ == '__main__':
@@ -226,7 +252,11 @@ def start_server():
 		
 	predictProcess = Process(target=predictImg, args=(faceQueue, resultQueue, framesProcessed, frame_num, end))
 	predictProcess.start()
-	print("started predict process")
+	print("started predict image process")
+	
+	NLPProcess = Process(target=predictSpeech)
+	predictProcess.start()
+	print("started predict speech process")
 	
 	# Start a socket listening for connections on 0.0.0.0:8000
 	server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -239,7 +269,7 @@ def start_server():
 	
 	# Start a client socket
 	client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	client_socket.connect(('10.18.221.194', 8001))
+	client_socket.connect(('10.0.0.116', 8001))
 	print("client connected!")
 	clientThread = threading.Thread(target=send_process, args=(client_socket, endSend, resultQueue))
 	clientThread.start()
@@ -247,7 +277,7 @@ def start_server():
 	faces = []
 	frame_count = 0
 	count = 0
-	#imgcounter = 0
+	imgcounter = 0
 	
 	try:
 		while True:
@@ -270,11 +300,20 @@ def start_server():
 			# Rewind the stream, open it as an image with PIL and do some
 			# processing on it
 			image_stream.seek(0)
-			img = np.asarray(Image.open(image_stream))
 			
-			#savedImage = Image.fromArray(img)
-			#savedImage.save("my_image" + str(imgcounter) + ".jpeg")
+			data = np.fromstring(image_stream.getvalue(), dtype=np.uint8)
+			img = cv2.imdecode(data, 1)
+			cv2.imshow("image", img)
+			
+			#img = np.asarray(Image.open(image_stream))
+			
+			#print("saving image")
+			#savedImage = Image.fromarray(img)
+			#img.save("my_image" + str(imgcounter) + ".jpg")
 			#imgcounter += 1
+			#print("image saved")
+			
+			
 			
 			print("img shape:")
 			print(img.shape)
