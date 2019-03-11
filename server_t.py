@@ -65,7 +65,7 @@ def send_process(sock, endSend, resultQueue):
 			counter += 1
 			#newInfo = False
 	
-def assignJob(imgQueue, resultQueue, imgMutex, faceQueue, end, framesProcessed, counterMutex):
+def assignJob(imgQueue, resultQueue, imgMutex, faceQueue, end, framesProcessed, frame_num):
 	#while endSend is False or imgQueue.empty() is False:
 	while end.value == 0 or imgQueue.empty() is False:
 	#if imgQueue.empty() is False:
@@ -81,7 +81,7 @@ def assignJob(imgQueue, resultQueue, imgMutex, faceQueue, end, framesProcessed, 
 			if face is not None:
 				faceQueue.put(face)
 			framesProcessed.value += 1
-			while framesProcessed.value >= 5:
+			if faceQueue.qsize() >= frame_num:
 				continue
 				
 	print(str(end.value) + " process assignJob ending")
@@ -158,15 +158,18 @@ def processImg(img):
 
 	
 def predictImg(faceQueue, resultQueue, framesProcessed, frame_num, end):
-	while end.value == 0 or faceQueue.empty() is False:
-		if framesProcessed.value >= 5:
+	while end.value == 0:
+		if faceQueue.qsize() >= frame_num:
 			faces = []
-			while faceQueue.empty() is False:
+			for i in range(frame_num):
 				faces.append(faceQueue.get())
+			#while faceQueue.empty() is False:
+			#faces.append(faceQueue.get())
+			
 			# detect whether the image contains one of the seven emotions
 			# using the trained model
 			# label everyone in frame
-			framesProcessed.value = 0
+			#framesProcessed.value = 0
 			
 			if len(faces) == 0:
 				print("got empty faces list")
@@ -193,7 +196,7 @@ def predictImg(faceQueue, resultQueue, framesProcessed, frame_num, end):
 				result = str(most_common) + ":" + str(conf_level) + "%:"
 			resultQueue.put(result)
 			print("prediction result: " + result)
-
+	print("predictImg thread ending")
 	
 #if __name__ == '__main__':
 def start_server():
@@ -208,7 +211,6 @@ def start_server():
 	resultQueue = Queue()
 	end = Value('i', 0)
 	framesProcessed = Value('i', 0)
-	counterMutex = Lock()
 	frame_num = 5
 
 
@@ -218,7 +220,7 @@ def start_server():
 
 	workerProcesses = []
 	for i in range(frame_num):
-		workerProcesses.append(Process(target=assignJob, args=(imgQueue, resultQueue, imgMutex, faceQueue, end, framesProcessed, counterMutex)))
+		workerProcesses.append(Process(target=assignJob, args=(imgQueue, resultQueue, imgMutex, faceQueue, end, framesProcessed, frame_num)))
 		workerProcesses[i].start()
 		print("started workers")
 		
@@ -237,7 +239,7 @@ def start_server():
 	
 	# Start a client socket
 	client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	client_socket.connect(('10.0.0.116', 8001))
+	client_socket.connect(('10.18.221.194', 8001))
 	print("client connected!")
 	clientThread = threading.Thread(target=send_process, args=(client_socket, endSend, resultQueue))
 	clientThread.start()
@@ -245,7 +247,7 @@ def start_server():
 	faces = []
 	frame_count = 0
 	count = 0
-	
+	#imgcounter = 0
 	
 	try:
 		while True:
@@ -269,6 +271,13 @@ def start_server():
 			# processing on it
 			image_stream.seek(0)
 			img = np.asarray(Image.open(image_stream))
+			
+			#savedImage = Image.fromArray(img)
+			#savedImage.save("my_image" + str(imgcounter) + ".jpeg")
+			#imgcounter += 1
+			
+			print("img shape:")
+			print(img.shape)
 			imgQueue.put(img)
 			
 			global currentFrame
