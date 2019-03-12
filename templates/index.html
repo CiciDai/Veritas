@@ -1,29 +1,65 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>Video Streaming Demonstration</title>
-	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-    <script src="{{url_for('static', filename='js/index.js')}}"></script>
-    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/style.css') }}">
+<title>Veritas Demonstration</title>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script src="index.js"></script>
+<link type="text/css" rel="stylesheet" href="style.css">
 </head>
 
 <body>
-<div id="title">
+<div id="logo">
   <h1 data_temp_dwid="1">Veritas</h1>
 </div>
-<div class="content"> 
-  <img src="{{ url_for('video_feed') }}">
-  <img src="/static/image/veritas.png" id= "video" alt="video stream">
-  <ul id="bar-graph"> 
-	  <li><span id="neutral" class="bar"></span><img src="/static/image/neutral.png" alt="neutral">neutral</li>
-	  <li><span id="anger" class="bar"></span><img src="/static/image/anger.png" alt="anger">anger</li>
-	  <li><span id="contempt" class="bar"></span><img src="/static/image/contempt.png" alt="contempt">contempt</li>
-	  <li><span id="disgust" class="bar"></span> <img src="/static/image/disgust.png" alt="disgust">disgust</li>
-	  <li><span id="fear" class="bar"></span> <img src="/static/image/fear.png" alt="fear">fear</li>
-	  <li><span id="happy" class="bar"></span> <img src="/static/image/happy.png" alt="happy">happy</li>
-	  <li><span id="sadness" class="bar"></span><img src="/static/image/sadness.png" alt="sadness">sadness</li>
-	  <li><span id="surprise" class="bar"></span><img src="/static/image/surprise.png" alt="surprise">surprise</li>
-  </ul>
+<div id="all">
+  <div class="content"> 
+    <!--    NLP Section   -->
+    <div id="nlp" class="datablock">
+      <h2 class="title">Language</h2>
+      <div id="words">
+        <h3 id="question">Q:</h3>
+        <p id="q-content" class="small_text"></p>
+        <h3 id="answer">A:</h3>
+        <p id="a-content"></p>
+      </div>
+      <ul id="bar-graph-nlp" class="bar-graph">
+        <li><span id="n-neutral" class="bar"></span><img src="./image/neutral.png" alt="neutral"></li>
+        <li><span id="n-anger" class="bar"></span><img src="./image/anger.png" alt="anger"></li>
+        <li><span id="n-contempt" class="bar"></span><img src="./image/contempt.png" alt="contempt"></li>
+        <li><span id="n-disgust" class="bar"></span> <img src="./image/disgust.png" alt="disgust"></li>
+        <li><span id="n-fear" class="bar"></span> <img src="./image/fear.png" alt="fear"></li>
+        <li><span id="n-happy" class="bar"></span> <img src="./image/happy.png" alt="happy"></li>
+        <li><span id="n-sadness" class="bar"></span><img src="./image/sadness.png" alt="sadness"></li>
+        <li><span id="n-surprise" class="bar"></span><img src="./image/surprise.png" alt="surprise"></li>
+      </ul>
+    </div>
+    <!--    Emotion recognition section -->
+    <div id="emotion" class="datablock">
+      <h2 class="title">Emotion</h2>
+      <!--	<img src="{{ url_for('video_feed') }}"  id= "video> --> 
+      <img src="./image/veritas.png" id= "video" alt="video stream"/>
+      <ul id="bar-graph-emotion"class="bar-graph">
+        <li><span id="neutral" class="bar"></span><img src="./image/neutral.png" alt="neutral"></li>
+        <li><span id="anger" class="bar"></span><img src="./image/anger.png" alt="anger"></li>
+        <li><span id="contempt" class="bar"></span><img src="./image/contempt.png" alt="contempt"></li>
+        <li><span id="disgust" class="bar"></span> <img src="./image/disgust.png" alt="disgust"></li>
+        <li><span id="fear" class="bar"></span> <img src="./image/fear.png" alt="fear"></li>
+        <li><span id="happy" class="bar"></span> <img src="./image/happy.png" alt="happy"></li>
+        <li><span id="sadness" class="bar"></span><img src="./image/sadness.png" alt="sadness"></li>
+        <li><span id="surprise" class="bar"></span><img src="./image/surprise.png" alt="surprise"></li>
+      </ul>
+    </div>
+  </div>
+  <div id="result" class="datablock">
+    <h2 class="title">Result</h2>
+    <div id="result_emoji"></div>
+    <h1 id="result_emotion"></h1>
+    <p id="overall_level" class="small_text">overall confidence level</p>
+    <h4 id="conf_level"></h4>
+  </div>
 </div>
+<footer>
+  <p>Made by the Visionphiles</p>
+</footer>
 </body>
 </html>
