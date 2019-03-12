@@ -80,6 +80,7 @@ h3 {
     border-radius: 10px 10px 10px 10px;
     margin: 1vw;
     background: white;
+    box-shadow: 1px 3px 6px 0 rgba(0, 0, 0, 0.1);
 }
 
 #result {
@@ -144,7 +145,7 @@ li {
   width: 22px;
   height: 0;
   border-radius: 2px 2px 0 0;
-  color: black;
+  color: lightslategray;
   font-size: 8px;
   overflow: hidden;
   text-align: center;
