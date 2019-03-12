@@ -19,13 +19,24 @@ import pickle
 
 
 text_len = 24
-data_classes = ['anger','disgust','fear','guilt','joy', 'sadness',  'shame' ]
+data_classes = ['anger','disgust','fear','guilt','joy',   'sadness',  'shame' ]
 
-model = tf.keras.models.load_model("NLPmodel_100d_cnn.h5")
+with open('tokenizer.pickle', 'rb') as handle:
+    tokenizer = pickle.load(handle)
+word_index = tokenizer.word_index
 
-model.compile(optimizer='adam',
+lstm_model = tf.keras.models.load_model("NLPmodel_100d_cnn.h5")
+
+lstm_model.compile(optimizer='adam',
 	loss='sparse_categorical_crossentropy',
 	metrics=['accuracy'])
+	
+
+word_index = {k:(v+1) for k,v in word_index.items()} 
+word_index['<PAD>']=0
+word_index["<UNK>"] = 1
+print(word_index)
+
 
 # lemmatize words
 def lemmatizer(words):
@@ -62,28 +73,32 @@ def recognizer(words):
 	return tree
 	
 def check_sentiment(sentence):
-#   sentiment = analyzer.polarity_scores(sentence)
-#   sentiment = {k:v+1 for k,v in sentiment.items()}
-#   pre_senti = list(sentiment.values())
 	tokens = text_to_word_sequence(sentence)
-	output = remove_stop_words(tokens)
+	#   output = remove_stop_words(tokens)
 	output = str(recognizer(tokens))
 	output = text_to_word_sequence(output, lower=False)
 	output = lemmatizer(output)
 	output = stemmer(output)
-	output = Tokenizer.texts_to_sequences([output])
-	#   output = pre_senti + output
+	output = tokenizer.texts_to_sequences([output])
 	output = tf.keras.preprocessing.sequence.pad_sequences(output,
-		padding = 'post',
-		value=word_index["<PAD>"],
-		maxlen=text_len)
+														padding = 'post',
+														value=word_index["<PAD>"],
+														maxlen=text_len)
 
 	probs = lstm_model.predict(output)
 	guess = np.argmax(probs, axis=-1)
 	result = data_classes[guess[0]]
 	return result
-	
 
-sentence = "the dish looks delicious"
-result = check_sentiment(sentence)
-print(result)
+if __name__ == '__main__':
+	while True:
+		sentence = input()
+		if sentence is "exit":
+			break
+		#sentence = 'I feel I will fail the circuit exam on Friday'
+		result = check_sentiment(sentence)
+		print(result)
+
+	#sentence = "the dish looks delicious"
+	#result = check_sentiment(sentence)
+	#print(result)

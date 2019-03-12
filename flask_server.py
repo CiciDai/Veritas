@@ -1,4 +1,4 @@
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, Response, request, jsonify
 import server_t
 import threading
 import cv2
@@ -8,8 +8,21 @@ import numpy as np
 app = Flask(__name__)
 
 
-@app.route('/')
+@app.route('/', methods=["GET", "POST"])
 def index():
+	if request.method == "POST":
+		print("post called")
+		counts = np.bincount(server_t.circBuffer, None, 8)
+		return jsonify(neutral=str(round(counts[0]/30.*100)) + "%", 
+					anger=str(round(counts[1]/30.*100)) + "%", 
+					contempt=str(round(counts[2]/30.*100)) + "%", 
+					disgust=str(round(counts[3]/30.*100)) + "%", 
+					fear=str(round(counts[4]/30.*100)) + "%", 
+					happy=str(round(counts[5]/30.*100)) + "%", 
+					sadness=str(round(counts[6]/30.*100)) + "%", 
+					surprise=str(round(counts[7]/30.*100)) + "%"
+					)
+		
 	return render_template('index.html')
 
 
@@ -31,10 +44,6 @@ def video_feed():
 	return Response(gen(), mimetype='multipart/x-mixed-replace; boundary=frame')
 	
 
-#def updateGraph():
-#	counts = np.bincount(server_t.circBuffer)
-	
-	
 if __name__ == '__main__':
 	server = threading.Thread(target=server_t.start_server)
 	server.start()

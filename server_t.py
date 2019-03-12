@@ -254,9 +254,9 @@ def start_server():
 	predictProcess.start()
 	print("started predict image process")
 	
-	NLPProcess = Process(target=predictSpeech)
-	predictProcess.start()
-	print("started predict speech process")
+	# NLPProcess = Process(target=predictSpeech)
+	# predictProcess.start()
+	# print("started predict speech process")
 	
 	# Start a socket listening for connections on 0.0.0.0:8000
 	server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

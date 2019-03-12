@@ -1,39 +1,48 @@
+var info = {
+    "neutral": "80%",
+    "anger": "30%",
+    "contempt": "35%",
+    "disgust": "30%",
+    "fear": "24%",
+    "happy": "15%",
+    "sadness": "30%",
+    "surprise": "29%"
+}
+
+var counter = 0
+
 $(document).ready(function () {    
-    var info = {
-       "neutral": "80%",
-        "anger": "30%",
-        "contempt": "35%",
-        "disgust": "30%",
-        "fear": "24%",
-        "happy": "15%",
-        "sadness": "30%",
-        "surprise": "29%"
-    }
-    
+    updateBar()
+}); 
+
+function updateBar() {
+    console.log("update called")
     for (var key in info) {
         $('#'+key).animate({
-            height: info[key]
-        }, 1000);
+            height: (info[key])
+        }, 500);
         $('#'+key).text(info[key]);
     }
-}); 
+}
 
 
 function update_values() {
-            $SCRIPT_ROOT = '{{ request.script_root|tojson|safe }}';
-            $.getJSON($SCRIPT_ROOT,
-                function(data) {
-                    console.log(data)
-                    $("#neutral").text(data.neutral+"%")
-                    $("#anger").text(data.anger+"%")
-                    $("#contempt").text(data.contempt+"%")
-                    $("#disgust").text(data.disgust+"%")
-                    $("#fear").text(data.fear+"%")
-                    $("#happy").text(data.happy+"%")
-                    $("#sadness").text(data.sadness+"%")
-                    $("#surprise").text(data.surprise+"%")
-                });
+    $SCRIPT_ROOT = "{{ request.script_root|tojson|safe }}";
+    $.post('/', {}, 
+        function(data) {
+            console.log(data);
+            info["neutral"] = data.neutral;
+            info["anger"] = data.anger;
+            info["contempt"] = data.contempt;
+            info["disgust"] = data.disgust;
+            info["fear"] = data.fear;
+            info["happy"] = data.happy;
+            info["sadness"] = data.sadness;
+            info["surprise"] = data.surprise;
         }
-        
-        
-setInterval(update_values, 1000)
+    );
+};
+
+
+var mytimer = setInterval(update_values, 500);
+var myupdate = setInterval(updateBar, 500);
