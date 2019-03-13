@@ -3,6 +3,7 @@
 <head>
 <title>Veritas Demonstration</title>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script src="https://canvasjs.com/assets/script/jquery.canvasjs.min.js"></script>
 <script src="index.js"></script>
 <link type="text/css" rel="stylesheet" href="style.css">
 </head>
@@ -17,9 +18,9 @@
     <div id="nlp" class="datablock">
       <h2 class="title">Language</h2>
       <div id="words">
-        <h3 id="question">Q:</h3>
+        <h3 id=>Stimulus:</h3>
         <p id="q-content" class="small_text"></p>
-        <h3 id="answer">A:</h3>
+        <h3>Response:</h3>
         <p id="a-content"></p>
       </div>
       <ul id="bar-graph-nlp" class="bar-graph">
@@ -52,10 +53,21 @@
   </div>
   <div id="result" class="datablock">
     <h2 class="title">Result</h2>
-    <div id="result_emoji"></div>
-    <h1 id="result_emotion"></h1>
-    <p id="overall_level" class="small_text">overall confidence level</p>
-    <h4 id="conf_level"></h4>
+      <h3>Current Emotion</h3>
+      <div id="current_emotion">    
+          <div class="vertical">
+            <p id="result_emotion"></p>
+            <div id="result_emoji"></div> 
+        </div>
+          <div class="vertical">
+            <p id="overall_level" class="small_text">confidence level</p>
+            <h4 id="conf_level"></h4>
+          </div>
+      </div>
+      <div id="prob_lie">
+        <h3>Probability of Lying Over Time</h3>
+        <div id="chartContainer" style="height: 100px; width: 100%;"></div>
+      </div>
   </div>
 </div>
 <footer>
