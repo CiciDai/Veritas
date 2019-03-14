@@ -5,7 +5,7 @@
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
 <script src="https://canvasjs.com/assets/script/jquery.canvasjs.min.js"></script>
 <script src="{{url_for('static', filename='js/index.js')}}"></script>
-<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/style.css') }}">
+<link type="text/css" rel="stylesheet" href="{{url_for('static',filename='styles/style.css')}}">
 </head>
 
 <body>
@@ -31,17 +31,16 @@
     <!--    Emotion recognition section -->
     <div id="emotion" class="datablock">
       <h2 class="title">Emotion</h2>
-      <!--	<img src="{{ url_for('video_feed') }}"  id= "video> --> 
-      <img src="./image/veritas.png" id= "video" alt="video stream"/>
+      <img src="../static/image/veritas.png" id= "video" alt="video stream"/>
       <ul id="bar-graph-emotion"class="bar-graph">
-        <li><span id="neutral" class="bar"></span><img src="/static/image/neutral.png" alt="neutral"></li>
-        <li><span id="anger" class="bar"></span><img src="/static/image/anger.png" alt="anger"></li>
-        <li><span id="contempt" class="bar"></span><img src="/static/image/contempt.png" alt="contempt"></li>
-        <li><span id="disgust" class="bar"></span> <img src="/static/image/disgust.png" alt="disgust"></li>
-        <li><span id="fear" class="bar"></span> <img src="/static/image/fear.png" alt="fear"></li>
-        <li><span id="happy" class="bar"></span> <img src="/static/image/happy.png" alt="happy"></li>
-        <li><span id="sadness" class="bar"></span><img src="/static/image/sadness.png" alt="sadness"></li>
-        <li><span id="surprise" class="bar"></span><img src="/static/image/surprise.png" alt="surprise"></li>
+        <li><span id="neutral" class="bar"></span><img src="../static/image/neutral.png" alt="neutral"></li>
+        <li><span id="anger" class="bar"></span><img src="../static/image/anger.png" alt="anger"></li>
+        <li><span id="contempt" class="bar"></span><img src="../static/image/contempt.png" alt="contempt"></li>
+        <li><span id="disgust" class="bar"></span> <img src="../static/image/disgust.png" alt="disgust"></li>
+        <li><span id="fear" class="bar"></span> <img src="../static/image/fear.png" alt="fear"></li>
+        <li><span id="happy" class="bar"></span> <img src="../static/image/happy.png" alt="happy"></li>
+        <li><span id="sadness" class="bar"></span><img src="../static/image/sadness.png" alt="sadness"></li>
+        <li><span id="surprise" class="bar"></span><img src="../static/image/surprise.png" alt="surprise"></li>
       </ul>
     </div>
   </div>
