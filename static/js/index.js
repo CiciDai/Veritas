@@ -82,17 +82,6 @@ $(document).ready(function () {
         var limit = 30;
 
         setInterval(function updateData() {
-            // if(counter < dataPoints.length){
-            //     if(points.length > limit){
-            //         points.push(dataPoints[counter]);
-            //         points.shift();
-
-            //     }else{
-            //         points.push(dataPoints[counter]);
-            //     }
-            //     counter++;
-            //     $("#chartContainer").CanvasJSChart(options);
-            // }
             if(counter < points.length){
                 if (counter > limit) {
                     dataPoints.push({x: counter, y: points[counter]});
@@ -200,40 +189,7 @@ $(document).ready(function () {
         }
         return points;
     }
-     // update nlp result
-    // var nlp_emoji = text_pic[nlp_info['result']];
-    // var nlp_percent = nlp_info["percent"].toString();
-    // $('#nlp_emoji_div').html(nlp_info['result'] + '<img id="nlp_emoji" src=' + nlp_emoji);
-    // $('#nlp_conf_div').html('confidence level' + "<p id='nlp_conf'>" + nlp_percent + "</p>");
-    
+
     var mytimer = setInterval(update_values, 500);
     var myupdate = setInterval(updateBar, 500);
-
-    // Initial Values
-//    var xValue = 0;
-//    var yValue = 0;
-//    var newDataCount = 6;
-//
-//    function addData(data) {
-//        if(newDataCount != 1) {
-//            $.each(data, function(key, value) {
-//                dataPoints.push({x: value[0], y: parseInt(value[1])});
-//                xValue++;
-//                yValue = parseInt(value[1]);
-//            });
-//        } else {
-//            dataPoints.shift();
-//            dataPoints.push({x: data[0][0], y: parseInt(data[0][1])});
-//            xValue++;
-//            yValue = parseInt(data[0][1]);
-//        }
-//
-//        newDataCount = 1;
-//        $("#chartContainer").CanvasJSChart(options);
-//        setTimeout(updateData, 1500);
-//    }
-//    
-//    function updateData() {
-//        $.getJSON("data.json", addData);
-//    }
 }); 
