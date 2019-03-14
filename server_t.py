@@ -17,6 +17,8 @@ import tensorflow as tf
 from tensorflow.python.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, BatchNormalization, Activation
 from skimage import filters, feature
 
+import NLP
+
 
 # load frontal face detector
 face_cascade = cv2.CascadeClassifier('lbpcascade_frontalface_improved.xml')
@@ -34,25 +36,21 @@ model.compile(loss='sparse_categorical_crossentropy',
 	
 # load the labels for emotion
 emotion = ['neutral', 'anger', 'contempt', 'disgust', 'fear', 'happy', 'sadness', 'surprise']
+sentiment = ['anger', 'disgust', 'fear', 'guilt', 'joy', 'sadness', 'shame']
 
 currentFrame = None
-circBuffer = np.zeros((30,), dtype=int)
+circBuffer = np.zeros((150,2), dtype=int)
 
 
-contrastMatrix = [[0.0, 0.7, 0.7, 0.7, 0.7, 0.6, 0.6, 0.7, 0.4],
-					[0.4, 0.0, 0.3, 0.3, 0.4, 0.7, 0.6, 0.6, 0.7],
-					[0.3, 0.3, 0.0, 0.3, 0.5, 0.7, 0.6, 0.5, 0.5],
-					[0.5, 0.3, 0.3, 0.0, 0.4, 0.7, 0.6, 0.4, 0.6],
-					[0.6, 0.6, 0.4, 0.5, 0.0, 0.7, 0.6, 0.5, 0.5],
-					[0.5, 0.8, 0.8, 0.7, 0.7, 0.0, 0.7, 0.3, 0.6],
-					[0.5, 0.6, 0.6, 0.5, 0.4, 0.8, 0.0, 0.5, 0.5],
-					[0.7, 0.4, 0.7, 0.3, 0.4, 0.3, 0.3, 0.0, 0.6],
-					[0.4, 0.5, 0.5, 0.7, 0.7, 0.5, 0.5, 0.6, 0.0]]
+contrastMatrix = [[0.6, 0.7, 0.7, 0.5, 0.2, 0.5, 0.5],
+					[0.0, 0.3, 0.8, 0.7, 1.0, 0.5, 0.7],
+					[0.2, 0.3, 0.7, 0.8, 0.9, 0.9, 0.8],
+					[0.3, 0.0, 0.6, 0.3, 1.0, 0.8, 0.3],
+					[0.8, 0.6, 0.0, 0.2, 1.0, 0.3, 0.2],
+					[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+					[0.5, 0.5, 0.3, 0.0, 1.0, 0.0, 0.0],
+					[0.5, 0.3, 0.3, 0.5, 0.5, 0.5, 0.3]]
 
-
-#def predictSpeech():
-#	#TODO load model here (how?)	
-#	predictLies(emotion)
 
 
 #def predictLies(emotion):
@@ -62,6 +60,10 @@ contrastMatrix = [[0.0, 0.7, 0.7, 0.7, 0.7, 0.6, 0.6, 0.7, 0.4],
 #	total /= len(circBuffer)
 #	if total > 0.6:
 #		print("lie detected")
+
+def getStrTime():
+	msTime = str(round(time.time() * 1000))
+	return msTime[-8:]
 
 
 def send_process(sock, endSend, resultQueue):
@@ -82,12 +84,13 @@ def send_process(sock, endSend, resultQueue):
 			#resultMutex.acquire()
 			result = resultQueue.get()
 			global circBuffer
-			circBuffer = np.roll(circBuffer, 1)
-			circBuffer[29] = int(result.split(':')[0])
-			print(circBuffer)
-			sock.send(result.encode())
+			circBuffer = np.roll(circBuffer, 1, axis=1)
+			circBuffer[0][0] = result[0]
+			circBuffer[0][1] = int(result[1].split(':')[0])
+			#print(circBuffer)
+			sock.send(result[1].encode())
 			#resultMutex.release()
-			print("sent frame " + str(counter) + ": " + result + " at time = " + str(time.time()))
+			print("sent frame " + str(counter) + ": " + result[1] + " at time = " + str(time.time()))
 			counter += 1
 			#newInfo = False
 	
@@ -100,12 +103,12 @@ def assignJob(imgQueue, resultQueue, imgMutex, faceQueue, end, framesProcessed, 
 		if imgQueue.empty() is True:
 			imgMutex.release()
 		else:
-			img = imgQueue.get()
+			timeImg = imgQueue.get()
 			imgMutex.release()
-			face = processImg(img)
+			face = processImg(timeImg[1])
 			print("processed frame " + str(framesProcessed.value) + " at time = " + str(time.time()))
 			if face is not None:
-				faceQueue.put(face)
+				faceQueue.put((timeImg[0], face))
 			framesProcessed.value += 1
 			if faceQueue.qsize() >= frame_num:
 				continue
@@ -113,7 +116,7 @@ def assignJob(imgQueue, resultQueue, imgMutex, faceQueue, end, framesProcessed, 
 	print(str(end.value) + " process assignJob ending")
 
 def processImg(img):
-	print("processing image")
+	#print("processing image")
 	processStart = time.time()
 	faces = face_cascade.detectMultiScale(img, 1.3, 5, minSize=(50,50))
 	
@@ -139,45 +142,6 @@ def processImg(img):
 		# reshape face numpy into the shape of trained data
 		face = face[:, :, np.newaxis]
 		
-		#face = (face / 255.).astype(np.float32)
-		# detect whether the image contains one of the seven emotions
-		# using the trained model
-		
-		#faceQueue.put(face)
-		
-		
-		#print("making prediction!")
-		#predicted_prob = model.predict(face)
-		
-		# label everyone in frame
-		#for p in range(person):
-		#	print("for each person")
-		#	prediction = predicted_prob.argmax(axis=-1)[p]
-		#	conf_level = round(np.amax(predicted_prob[p]) * 100, 2)
-		#	result = "8::"
-		#	if conf_level > 40:
-		#		result = str(prediction) + ":" + str(conf_level) + "%:"
-		#	print("get prediction")
-			#cv2.putText(frame, emotion[prediction], (left[p], top[p]-14),
-			#            cv2.FONT_HERSHEY_SIMPLEX, 1, (250, 250, 250), thickness=2)
-			# save photo of this person's emotion
-			# name = emotion[prediction] + " " + str(time.time()) + '.bmp'
-			# cv2.imwrite(name, face[p] * 255)  # back to 0-255
-			
-			# send result over to client
-			
-			#if stringData == "Unknown" and result == "Unknown":
-			#	continue
-				
-			#resultMutex.acquire()
-			#print("acquired mutex!")
-			#resultQueue.put(result)
-		#for p in range(person):
-		#	print(result[p])
-			#results.append(result[p])
-			#resultMutex.release()
-			#print("released mutex!")
-			#newInfo = True
 		return face
 	#print("processing took " + str(time.time() - processStart) + "seconds.")
 	return None
@@ -187,15 +151,12 @@ def predictImg(faceQueue, resultQueue, framesProcessed, frame_num, end):
 	while end.value == 0:
 		if faceQueue.qsize() >= frame_num:
 			faces = np.zeros((frame_num, 96, 96, 1))
+			timestamp = 0
+			timeFace = None
 			for i in range(frame_num):
-				faces[i] = faceQueue.get()
-			#while faceQueue.empty() is False:
-			#faces.append(faceQueue.get())
-			
-			# detect whether the image contains one of the seven emotions
-			# using the trained model
-			# label everyone in frame
-			#framesProcessed.value = 0
+				timeFace = faceQueue.get()
+				faces[i] = timeFace[1]
+			timestamp = timeFace[0]
 			
 			if len(faces) == 0:
 				print("got empty faces list")
@@ -204,8 +165,8 @@ def predictImg(faceQueue, resultQueue, framesProcessed, frame_num, end):
 			#faces = np.array(faces)
 			
 			predicted_prob = model.predict(faces)  # predict
-			print("predicted_prob:")
-			print(predicted_prob)
+			#print("predicted_prob:")
+			#print(predicted_prob)
 			predictions = predicted_prob.argmax(axis=-1)
 			# get most common emotion
 			counts = np.bincount(predictions)
@@ -220,10 +181,20 @@ def predictImg(faceQueue, resultQueue, framesProcessed, frame_num, end):
 			result = "8::"
 			if conf_level > 20:
 				result = str(most_common) + ":" + str(conf_level) + "%:"
-			resultQueue.put(result)
+			resultQueue.put((timestamp, result))
 			print("prediction result: " + emotion[most_common])
 	print("predictImg thread ending")
+
 	
+def checkNLPResult(NLPQueue):
+	print("NLP empty")
+	while not NLPQueue.empty():
+		print("Got NLP response: " + NLPQueue.get())
+		
+
+def predictLie():
+	pass
+
 #if __name__ == '__main__':
 def start_server():
 	print("server starting")
@@ -235,6 +206,7 @@ def start_server():
 	imgMutex = Lock()
 	faceQueue = Queue()
 	resultQueue = Queue()
+	NLPQueue = Queue()
 	end = Value('i', 0)
 	framesProcessed = Value('i', 0)
 	frame_num = 5
@@ -254,6 +226,10 @@ def start_server():
 	predictProcess.start()
 	print("started predict image process")
 	
+	NLPProcess = Process(target=NLP.startNLP, args=(NLPQueue, end))
+	NLPProcess.start()
+	print("started predicting speech")
+	
 	# NLPProcess = Process(target=predictSpeech)
 	# predictProcess.start()
 	# print("started predict speech process")
@@ -269,7 +245,7 @@ def start_server():
 	
 	# Start a client socket
 	client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	client_socket.connect(('10.0.0.116', 8001))
+	client_socket.connect(('10.19.22.17', 8001))
 	print("client connected!")
 	clientThread = threading.Thread(target=send_process, args=(client_socket, endSend, resultQueue))
 	clientThread.start()
@@ -313,11 +289,7 @@ def start_server():
 			#imgcounter += 1
 			#print("image saved")
 			
-			
-			
-			print("img shape:")
-			print(img.shape)
-			imgQueue.put(img)
+			imgQueue.put((getStrTime(), img))
 			
 			global currentFrame
 			currentFrame = img[:,:,::-1]
@@ -337,6 +309,11 @@ def start_server():
 			
 			#cv2.imshow("img", img)#cv2.waitKey(1)
 			
+			#FOR TESTING
+			checkNLPResult(NLPQueue)
+			#FOR TESTING
+			
+			
 			if cv2.waitKey(5) & 0xFF == ord('q'):
 				break
 				
@@ -344,6 +321,7 @@ def start_server():
 		for worker in workerProcesses:
 			worker.join()
 		predictProcess.join()
+		NLPProcess.join()
 		clientThread.join()
 		recv_connection.close()
 		server_socket.close()

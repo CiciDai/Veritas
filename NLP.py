@@ -16,27 +16,16 @@ from nltk import pos_tag, ne_chunk
 
 import os
 import pickle
+import socket
+from multiprocessing import Queue, Value
 
 
-text_len = 24
-data_classes = ['anger','disgust','fear','guilt','joy',   'sadness',  'shame' ]
-
-with open('tokenizer.pickle', 'rb') as handle:
-    tokenizer = pickle.load(handle)
-word_index = tokenizer.word_index
-
-lstm_model = tf.keras.models.load_model("NLPmodel_100d_cnn.h5")
-
-lstm_model.compile(optimizer='adam',
-	loss='sparse_categorical_crossentropy',
-	metrics=['accuracy'])
-	
-
-word_index = {k:(v+1) for k,v in word_index.items()} 
-word_index['<PAD>']=0
-word_index["<UNK>"] = 1
-print(word_index)
-
+def text_to_tokens(words, word_index):
+	output = []
+	for word in words:
+		index = word_index.get(word, 1)
+		output.append(int(index))
+	return [output]
 
 # lemmatize words
 def lemmatizer(words):
@@ -72,14 +61,15 @@ def recognizer(words):
 	tree = chunkParser.parse(tagged)
 	return tree
 	
-def check_sentiment(sentence):
+def check_sentiment(sentence, text_len, lstm_model, word_index, data_classes):
 	tokens = text_to_word_sequence(sentence)
-	#   output = remove_stop_words(tokens)
-	output = str(recognizer(tokens))
-	output = text_to_word_sequence(output, lower=False)
+	output = remove_stop_words(tokens)
+#	output = str(recognizer(tokens))
+#	output = text_to_word_sequence(output, lower=False)
 	output = lemmatizer(output)
 	output = stemmer(output)
-	output = tokenizer.texts_to_sequences([output])
+#	output = tokenizer.texts_to_sequences([output])
+	output = text_to_tokens(output, word_index)
 	output = tf.keras.preprocessing.sequence.pad_sequences(output,
 														padding = 'post',
 														value=word_index["<PAD>"],
@@ -90,15 +80,45 @@ def check_sentiment(sentence):
 	result = data_classes[guess[0]]
 	return result
 
-if __name__ == '__main__':
-	while True:
-		sentence = input()
-		if sentence is "exit":
-			break
-		#sentence = 'I feel I will fail the circuit exam on Friday'
-		result = check_sentiment(sentence)
-		print(result)
+	
+def startNLP(NLPQueue, end):
+	text_len = 32
+	data_classes = ['anger','disgust','fear','guilt','joy',   'sadness',  'shame' ]
 
-	#sentence = "the dish looks delicious"
-	#result = check_sentiment(sentence)
-	#print(result)
+	with open('tokenizer.pickle', 'rb') as handle:
+		tokenizer = pickle.load(handle)
+	word_index = tokenizer.word_index
+	
+	lstm_model = tf.keras.models.load_model("NLPmodel_100d_32.h5")
+	
+	lstm_model.compile(optimizer='adam',
+		loss='sparse_categorical_crossentropy',
+		metrics=['accuracy'])
+
+	word_index = {k:(v+1) for k,v in word_index.items()} 
+	word_index['<PAD>']=0
+	word_index["<UNK>"] = 1
+	#print(word_index)
+
+	recv_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	recv_socket.bind(('0.0.0.0', 8002))
+	recv_socket.listen(0)
+	recv_conn = recv_socket.accept()[0]
+	
+	print("speech recv conn established")
+	
+	while end.value == 0:
+		recv_msg = recv_conn.recv(512).decode()
+		#sentence = 'I feel I will fail the circuit exam on Friday'
+		if recv_msg is not "":
+			print("got message: " + recv_msg)
+			result = check_sentiment(recv_msg, lstm_model, word_index)
+			print(result)
+			NLPQueue.put(result)
+
+	print("ending NLP")
+	
+
+if __name__ == '__main__':
+	end = Value('i', 0)
+	startNLP(end)
