@@ -10,7 +10,7 @@ body {
 }
 
 #all {
-    max-width: 65vw;
+    max-width: 75vw;
     padding-top: 16px;
     margin-left: auto;
     margin-right: auto;
@@ -101,12 +101,11 @@ h3 {
 }
 
 #nlp {
-    flex: 2;
+    flex: 1;
 }
 
 #words{
-   padding-left: 16px;
-   margin-bottom: 100px;
+    padding-left: 16px;
 }
 
 #emotion{
@@ -119,6 +118,37 @@ h3 {
     bottom: 0;
     max-width: 100%;
     height: auto;
+}
+
+#result_nlp{
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: flex-end;
+    font-size: 10px;
+    height: 60px;
+    margin-bottom: 10px;
+    margin-right: 10px;
+}
+
+#result_nlp img{
+	width: 32px;
+    padding: 10px;
+}
+
+#nlp_conf_div {
+    position: relative;
+    justify-content: flex-start;
+    width: 100px;
+    height: 100%;
+}
+
+#nlp_conf {
+    position: absolute;
+    margin-top: 18px;
+    color: #90C277;
+    font-size: 20px;
+    align-self: center;
 }
 
 .bar-graph{
