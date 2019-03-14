@@ -41,6 +41,8 @@ def send_process(sock):
 	#send_connection = sock.makefile('wb')
 	while True:
 		if endSend is True:
+			print("end sending!")
+			sock.send(str("end_stream").encode())
 			break
 		global newInfo
 		if newInfo is True:
@@ -71,7 +73,7 @@ image_stream = io.BytesIO()
 
 # Start a client socket
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client_socket.connect(('10.0.0.116', 8001))
+client_socket.connect(('10.18.233.18', 8001))
 print("client connected!")
 clientThread = threading.Thread(target=send_process, args=(client_socket,))
 clientThread.start()
@@ -85,6 +87,9 @@ try:
 		# length is zero, quit the loop
 		image_len = struct.unpack('<L', recv_connection.read(struct.calcsize('<L')))[0]
 		if not image_len:
+			# tell client to end
+			print("rec'd 0 size end string")
+			endSend = True
 			break
 		# Construct a stream to hold the image data and read the image
 		# data from the recv_connection
@@ -94,10 +99,13 @@ try:
 		# Rewind the stream, open it as an image with PIL and do some
 		# processing on it
 		image_stream.seek(0)
+		print("opening image!")
 		img = np.asarray(Image.open(image_stream))
 		
+		print("to gray")
 		gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 		if frame_count >= 3:
+			print("get faces")
 			faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 			#faces = detector(gray, 0)
 			frame_count = 0
@@ -139,9 +147,9 @@ try:
 				print("for each person")
 				prediction = predicted_prob.argmax(axis=-1)[p]
 				conf_level = round(np.amax(predicted_prob[p]) * 100, 2)
-				result = "Unknown"
+				result = "unknown:"
 				if conf_level > 40:
-					result = str(prediction) + ":" + str(conf_level) + "%"
+					result = str(prediction) + ":" + str(conf_level) + "%:"
 				print("get prediction")
 				#cv2.putText(frame, emotion[prediction], (left[p], top[p]-14),
 				#            cv2.FONT_HERSHEY_SIMPLEX, 1, (250, 250, 250), thickness=2)
@@ -150,8 +158,8 @@ try:
 				# cv2.imwrite(name, face[p] * 255)  # back to 0-255
 				
 				# send result over to client
-				if stringData == "Unknown" and result == "Unknown":
-					continue
+				#if stringData == "Unknown" and result == "Unknown":
+				#	continue
 					
 				mutex.acquire()
 				print("acquired mutex!")
@@ -171,6 +179,7 @@ try:
 		#        y = shape.part(i).y
 		#        cv2.circle(img, (x, y), 3, (0, 150, 255))
 		#        print("ran")
+		print("image stream reset")
 		image_stream.seek(0)
 		image_stream.truncate()
 		frame_count += 1
