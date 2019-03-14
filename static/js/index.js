@@ -194,7 +194,7 @@ $(document).ready(function () {
     function cvtPoints(data, index_j, counter){
         var emotions = data.split(':');
         var points = [];
-        for(i=0; i<emotions.length; i++){
+        for(i=0; i<emotions.length - 1; i++){
             var index_i = parseInt(emotions[i]);
             points.push(lie_matrix[index_i][index_j]);
         }

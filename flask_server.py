@@ -16,7 +16,7 @@ def index():
 		print("post called")
 		#counts = np.bincount(server_t.circBuffer, None, 8)
 		mybuffer = ""
-		counts = [0,0,0,0,0,0,0,0]
+		counts = [0,0,0,0,0,0,0,0,0]
 		timeNLP=(0,"none", "none")
 		if server_t.NLPQueue.qsize() > 0: # new NLP response
 			timeNLP = server_t.NLPQueue.get()
@@ -26,6 +26,7 @@ def index():
 					mybuffer += str(item[1]) + ':'
 					print(mybuffer)
 				counts[item[1]] += 1
+		buffersize = max(sum(counts)-counts[8], 1)
 				
 		print("my post response:")
 		print("useful emotions: " + mybuffer)
@@ -33,14 +34,14 @@ def index():
 		print("speech sentiment: " + timeNLP[1])
 		print("sentence: " + timeNLP[2])
 		return jsonify(circBuffer=mybuffer,
-					neutral=str(round(counts[0]/30.*100)) + "%", 
-					anger=str(round(counts[1]/30.*100)) + "%", 
-					contempt=str(round(counts[2]/30.*100)) + "%", 
-					disgust=str(round(counts[3]/30.*100)) + "%", 
-					fear=str(round(counts[4]/30.*100)) + "%", 
-					happy=str(round(counts[5]/30.*100)) + "%", 
-					sadness=str(round(counts[6]/30.*100)) + "%", 
-					surprise=str(round(counts[7]/30.*100)) + "%",
+					neutral=str(round(counts[0]/buffersize*100)) + "%", 
+					anger=str(round(counts[1]/buffersize*100)) + "%", 
+					contempt=str(round(counts[2]/buffersize*100)) + "%", 
+					disgust=str(round(counts[3]/buffersize*100)) + "%", 
+					fear=str(round(counts[4]/buffersize*100)) + "%", 
+					happy=str(round(counts[5]/buffersize*100)) + "%", 
+					sadness=str(round(counts[6]/buffersize*100)) + "%", 
+					surprise=str(round(counts[7]/buffersize*100)) + "%",
 					
 					latest_emo=str(server_t.circBuffer[0][1]),
 					emo_conf="30%",

@@ -31,7 +31,7 @@
     <!--    Emotion recognition section -->
     <div id="emotion" class="datablock">
       <h2 class="title">Emotion</h2>
-      <img src="../static/image/veritas.png" id= "video" alt="video stream"/>
+      <img src="{{ url_for('video_feed') }}" id= "video" alt="video stream"/>
       <ul id="bar-graph-emotion"class="bar-graph">
         <li><span id="neutral" class="bar"></span><img src="../static/image/neutral.png" alt="neutral"></li>
         <li><span id="anger" class="bar"></span><img src="../static/image/anger.png" alt="anger"></li>
