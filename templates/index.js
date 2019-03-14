@@ -1,13 +1,18 @@
 $(document).ready(function () {    
+      var text_pic = {
+        "neutral": '"./image/neutral.png" alt="neutral"/>',
+        "anger": '"./image/anger.png" alt="anger"/>',
+        "contempt": '"./image/contempt.png" alt="contempt"/>',
+        "disgust": '"./image/disgust.png" alt="disgust"/>',
+        "fear": '"./image/fear.png" alt="fear"/>',
+        "happy": '"./image/happy.png" alt="happy"/>',
+        "sadness": '"./image/sadness.png" alt="sadness"/>',
+        "surprise": '"./image/surprise.png" alt="surprise"/>'
+    }
+      
     var nlp_info = {
-       "neutral": 80,
-        "anger": 30,
-        "contempt": 35,
-        "disgust": 30,
-        "fear": 24,
-        "happy": 15,
-        "sadness": 3,
-        "surprise": 29
+       "result": "anger",
+        "percent": 20
     }
     var emotion_info = {
        "neutral": 80,
@@ -20,6 +25,7 @@ $(document).ready(function () {
         "surprise": 29
     }
     
+    // update emotion result
     for (var key in emotion_info) {
         var percent = emotion_info[key].toString() +"%";
         $('#'+key).append("<p>" + percent + "</p>");
@@ -28,13 +34,14 @@ $(document).ready(function () {
         }, 1000);
     }
     
-    for (var nlp_key in nlp_info) {
-        var nlp_percent = nlp_info[nlp_key].toString() + "%";
-        $('#n-'+nlp_key).append("<p>" + nlp_percent + "</p>");
-        $('#n-'+nlp_key).animate({
-            height: nlp_percent
-        }, 1000);
-    }
+     // update nlp result
+    var nlp_emoji = text_pic[nlp_info['result']];
+    var nlp_percent = nlp_info["percent"].toString() + "%";
+    $('#nlp_emoji_div').append(nlp_info['result']);
+    $('#nlp_emoji_div').append('<img id="nlp_emoji" src=' + nlp_emoji);
+    $('#nlp_conf_div').append('confidence level');
+    $('#nlp_conf_div').append('<p id="nlp_conf">' + " " + nlp_percent + "</p>");
+    
     var nlp_word = {
         "q-content": "Tell me about your weekends.",
         "a-content": "Nothing much. I went to school to do my project."
@@ -53,18 +60,7 @@ $(document).ready(function () {
         $('#' + result).text(overall[result]);
     }
     
-    var text_pic = {
-        "neutral": '"./image/neutral.png" alt="neutral"/>',
-        "anger": '"./image/anger.png" alt="anger"/>',
-        "contempt": '"./image/contempt.png" alt="contempt"/>',
-        "disgust": '"./image/disgust.png" alt="disgust"/>',
-        "fear": '"./image/fear.png" alt="fear"/>',
-        "happy": '"./image/happy.png" alt="happy"/>',
-        "sadness": '"./image/sadness.png" alt="sadness"/>',
-        "surprise": '"./image/surprise.png" alt="surprise"/>'
-    }
-    
-    var emotion = $('#result_emotion').text();
+    var emotion = overall["result_emotion"];
     $('#result_emoji').prepend('<img id="emoji" src=' + text_pic[emotion]);
     
 // Get overtime data for lying prob
@@ -95,7 +91,7 @@ $(document).ready(function () {
 	}]
     };
     var counter = 0;
-    var limit = 15;
+    var limit = 30;
     setInterval(function updateData() {
         if (counter > limit) {
             dataPoints.push({x: counter, y: Math.random()});
