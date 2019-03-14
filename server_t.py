@@ -21,7 +21,7 @@ import NLP
 
 
 # load frontal face detector
-face_cascade = cv2.CascadeClassifier('lbpcascade_frontalface_improved.xml')
+face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
 # load model
 model = tf.keras.models.load_model("all_model.h5")
@@ -40,6 +40,7 @@ sentiment = ['anger', 'disgust', 'fear', 'guilt', 'joy', 'sadness', 'shame']
 
 currentFrame = None
 circBuffer = np.zeros((150,2), dtype=int)
+NLPQueue = Queue()
 
 
 contrastMatrix = [[0.6, 0.7, 0.7, 0.5, 0.2, 0.5, 0.5],
@@ -84,7 +85,7 @@ def send_process(sock, endSend, resultQueue):
 			#resultMutex.acquire()
 			result = resultQueue.get()
 			global circBuffer
-			circBuffer = np.roll(circBuffer, 1, axis=1)
+			circBuffer = np.roll(circBuffer, 1, axis=0)
 			circBuffer[0][0] = result[0]
 			circBuffer[0][1] = int(result[1].split(':')[0])
 			#print(circBuffer)
@@ -94,19 +95,40 @@ def send_process(sock, endSend, resultQueue):
 			counter += 1
 			#newInfo = False
 	
-def assignJob(imgQueue, resultQueue, imgMutex, faceQueue, end, framesProcessed, frame_num):
+def assignJob(imgQueue, resultQueue, imgMutex, faceQueue, end, framesTaken, framesProcessed, frame_num, threadNum):
 	#while endSend is False or imgQueue.empty() is False:
 	while end.value == 0 or imgQueue.empty() is False:
 	#if imgQueue.empty() is False:
-		
+		# if framesTaken.value % frame_num == threadNum: # my turn
+			# imgMutex.acquire()
+			# if imgQueue.empty() is True:
+				# imgMutex.release()
+			# else:
+				# timeImg = imgQueue.get()
+				# imgMutex.release()
+				# framesTaken.value += 1
+				
+				# face = processImg(timeImg[1])
+				# print("processed frame " + str(framesProcessed.value) + " at time = " + str(time.time()))
+					
+				# if face is not None:
+					# while framesProcessed.value % frame_num != threadNum: # wait for your turn
+						# continue
+					# faceQueue.put((timeImg[0], face))
+				# framesProcessed.value += 1
+				# if faceQueue.qsize() >= frame_num:
+					# continue
 		imgMutex.acquire()
 		if imgQueue.empty() is True:
 			imgMutex.release()
 		else:
 			timeImg = imgQueue.get()
 			imgMutex.release()
+			framesTaken.value += 1
+				
 			face = processImg(timeImg[1])
 			print("processed frame " + str(framesProcessed.value) + " at time = " + str(time.time()))
+					
 			if face is not None:
 				faceQueue.put((timeImg[0], face))
 			framesProcessed.value += 1
@@ -147,7 +169,7 @@ def processImg(img):
 	return None
 
 	
-def predictImg(faceQueue, resultQueue, framesProcessed, frame_num, end):
+def predictImg(faceQueue, resultQueue, frame_num, end):
 	while end.value == 0:
 		if faceQueue.qsize() >= frame_num:
 			faces = np.zeros((frame_num, 96, 96, 1))
@@ -189,7 +211,8 @@ def predictImg(faceQueue, resultQueue, framesProcessed, frame_num, end):
 def checkNLPResult(NLPQueue):
 	print("NLP empty")
 	while not NLPQueue.empty():
-		print("Got NLP response: " + NLPQueue.get())
+		timeNLP = NLPQueue.get()
+		print("Got NLP response: " + timeNLP[1] + "at time " + timeNLP[0])
 		
 
 def predictLie():
@@ -206,10 +229,11 @@ def start_server():
 	imgMutex = Lock()
 	faceQueue = Queue()
 	resultQueue = Queue()
-	NLPQueue = Queue()
+	#NLPQueue = Queue()
 	end = Value('i', 0)
+	framesTaken = Value('i', 0)
 	framesProcessed = Value('i', 0)
-	frame_num = 5
+	frame_num = 6
 
 
 	#predictor_path = 'shape_predictor_68_face_landmarks.dat'
@@ -217,12 +241,12 @@ def start_server():
 	#predictor = dlib.shape_predictor(predictor_path)
 
 	workerProcesses = []
-	for i in range(frame_num):
-		workerProcesses.append(Process(target=assignJob, args=(imgQueue, resultQueue, imgMutex, faceQueue, end, framesProcessed, frame_num)))
+	for i in range(6):
+		workerProcesses.append(Process(target=assignJob, args=(imgQueue, resultQueue, imgMutex, faceQueue, end, framesTaken, framesProcessed, frame_num, i)))
 		workerProcesses[i].start()
 		print("started workers")
 		
-	predictProcess = Process(target=predictImg, args=(faceQueue, resultQueue, framesProcessed, frame_num, end))
+	predictProcess = Process(target=predictImg, args=(faceQueue, resultQueue, frame_num, end))
 	predictProcess.start()
 	print("started predict image process")
 	
@@ -310,7 +334,7 @@ def start_server():
 			#cv2.imshow("img", img)#cv2.waitKey(1)
 			
 			#FOR TESTING
-			checkNLPResult(NLPQueue)
+			#checkNLPResult(NLPQueue)
 			#FOR TESTING
 			
 			

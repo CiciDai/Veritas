@@ -83,7 +83,7 @@ def check_sentiment(sentence, text_len, lstm_model, word_index, data_classes):
 	
 def startNLP(NLPQueue, end):
 	text_len = 32
-	data_classes = ['anger','disgust','fear','guilt','joy',   'sadness',  'shame' ]
+	data_classes = ['anger','disgust','fear','guilt','joy','sadness','shame' ]
 
 	with open('tokenizer.pickle', 'rb') as handle:
 		tokenizer = pickle.load(handle)
@@ -110,15 +110,16 @@ def startNLP(NLPQueue, end):
 	while end.value == 0:
 		recv_msg = recv_conn.recv(512).decode()
 		#sentence = 'I feel I will fail the circuit exam on Friday'
-		if recv_msg is not "":
-			print("got message: " + recv_msg)
-			result = check_sentiment(recv_msg, lstm_model, word_index)
+		timeSpeech = recv_msg.split(';')
+		if len(timeSpeech) > 1:
+			print("got message: " + timeSpeech[1])
+			result = check_sentiment(timeSpeech[1], text_len, lstm_model, word_index, data_classes)
 			print(result)
-			NLPQueue.put(result)
+			NLPQueue.put((timeSpeech[0], result, timeSpeech[1]))
 
 	print("ending NLP")
 	
 
-if __name__ == '__main__':
-	end = Value('i', 0)
-	startNLP(end)
+#if __name__ == '__main__':
+#	end = Value('i', 0)
+#	startNLP(end)

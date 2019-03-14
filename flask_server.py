@@ -8,19 +8,46 @@ import numpy as np
 app = Flask(__name__)
 
 
+#NLPLookUp = {"neutral":0, "anger":1, "contempt":2, "disgust":3, "fear":4, "happy":5, "sadness":6, "surprise":7}
+
 @app.route('/', methods=["GET", "POST"])
 def index():
 	if request.method == "POST":
 		print("post called")
-		counts = np.bincount(server_t.circBuffer, None, 8)
-		return jsonify(neutral=str(round(counts[0]/30.*100)) + "%", 
+		#counts = np.bincount(server_t.circBuffer, None, 8)
+		mybuffer = ""
+		counts = [0,0,0,0,0,0,0,0]
+		timeNLP=(0,"none", "none")
+		if server_t.NLPQueue.qsize() > 0: # new NLP response
+			timeNLP = server_t.NLPQueue.get()
+			print("got NLP response")
+			for item in server_t.circBuffer:
+				if abs(int(item[0]) - int(timeNLP[0])) < 3000:
+					mybuffer += str(item[1]) + ':'
+					print(mybuffer)
+				counts[item[1]] += 1
+				
+		print("my post response:")
+		print("useful emotions: " + mybuffer)
+		print("latest emotion: " + str(server_t.circBuffer[0][1]))
+		print("speech sentiment: " + timeNLP[1])
+		print("sentence: " + timeNLP[2])
+		return jsonify(circBuffer=mybuffer,
+					neutral=str(round(counts[0]/30.*100)) + "%", 
 					anger=str(round(counts[1]/30.*100)) + "%", 
 					contempt=str(round(counts[2]/30.*100)) + "%", 
 					disgust=str(round(counts[3]/30.*100)) + "%", 
 					fear=str(round(counts[4]/30.*100)) + "%", 
 					happy=str(round(counts[5]/30.*100)) + "%", 
 					sadness=str(round(counts[6]/30.*100)) + "%", 
-					surprise=str(round(counts[7]/30.*100)) + "%"
+					surprise=str(round(counts[7]/30.*100)) + "%",
+					
+					latest_emo=str(server_t.circBuffer[0][1]),
+					emo_conf="30%",
+					
+					speech_senti=timeNLP[1],
+					speech_conf="50%",
+					sentence=timeNLP[2]
 					)
 		
 	return render_template('index.html')
