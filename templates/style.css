@@ -42,11 +42,7 @@ h2 {
 h3 {
     color: #DEDEDE;
     font-size: 16px;
-}
-
-#result_emotion{
-    font-weight: 100;
-    font-size: 30px;
+    padding-top: 10px;
 }
 
 .small_text {
@@ -57,25 +53,25 @@ h3 {
 
 #overall_level{
     position: absolute;
-    width: 100%;
-    top: 58%;
+    padding-bottom: 30%;
 }
 
 #conf_level{
     color: #90C277;
+    font-weight: 800;
     font-style: oblique;
-    font-size: 100px;
+    font-size: 50px;
 }
 
 .content{
-    flex: 2;
+    flex: 1;
     display: flex;
     flex-direction: column;
 }
 
 .datablock{
     position: relative;
-    width: 570px;
+    width: 500px;
     height: auto;
     border-radius: 10px 10px 10px 10px;
     margin: 1vw;
@@ -90,16 +86,31 @@ h3 {
     justify-content: center;
 }
 
+#current_emotion{
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    justify-content: space-evenly;
+}
+
+.vertical{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+}
+
 #nlp {
-    flex: 1;
+    flex: 2;
 }
 
 #words{
    padding-left: 16px;
+   margin-bottom: 100px;
 }
 
 #emotion{
-    height: 370px;
+    height: 330px;
     overflow: hidden;
 }
 
@@ -113,7 +124,7 @@ h3 {
 .bar-graph{
     position:  absolute;
     height: 50px;
-    width:  265px;
+    width:  232px;
     list-style-type: none;
 	display: flex;
 	flex-flow: row nowrap;
@@ -134,14 +145,13 @@ li {
     display: flex;
     flex-flow: row nowrap;
     align-content: center;
-	padding: 6px 34px 0 0px;
+	padding: 6px 30px 0 0px;
     color: darkgray;
 }
 
 .bar {
   position: absolute; 
   bottom: 0; 
-  padding-top: 2px;
   width: 22px;
   height: 0;
   border-radius: 2px 2px 0 0;
@@ -150,13 +160,19 @@ li {
   overflow: hidden;
   text-align: center;
   font-weight: 200;
-  line-height: -20px;
   background-color: lightblue;
 }
 
-span:hover {
+.bar:hover {
     background-color: darkslategray;
-    color: white;
+    overflow: visible;
+}
+
+.bar p{
+    font-size: 18px;
+    text-align: center;
+    transform: translate(-3px, -40px);
+    color: lightgray;
 }
 
 #result_emoji{
@@ -165,8 +181,14 @@ span:hover {
 }
 
 #emoji{
-    width:190px;
+    width:160px;
     height: auto;
+}
+
+#prob_lie{
+    max-width: 100%;
+    height: auto;
+    padding: 10px;
 }
 
 footer{

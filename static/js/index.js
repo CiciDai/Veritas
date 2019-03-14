@@ -17,11 +17,19 @@ $(document).ready(function () {
 
 function updateBar() {
     console.log("update called")
+    // update emotion bar
     for (var key in info) {
         $('#'+key).animate({
             height: (info[key])
         }, 500);
-        $('#'+key).text(info[key]);
+        $('#'+key).append("<p>" + info[key] + "</p>");
+    }
+    // update nlp bar
+    for (var key in info) {
+        $('#n-'+key).animate({
+            height: (info[key])
+        }, 500);
+        $('#n-'+key).append("<p>" + info[key] + "</p>");
     }
 }
 
@@ -43,6 +51,44 @@ function update_values() {
     );
 };
 
+// plot probability over time
+var dataPoints = [];
+var font_color = "#90C277";
+var grid_color = "lightgray";
+var options = {
+    theme: "light2",
+    height: 200,
+    axisX: {
+        title: "Time (second)",
+        titleFontColor: font_color,
+        interval: 1,
+        gridColor: grid_color,
+        gridThickness: 1
+    },
+    axisY: {
+        title: "Probability of Lying",
+        titleFontColor: font_color,
+        interval: 0.1,
+        gridColor: grid_color
+    },
+    data: [{        
+        type: "spline",       
+        dataPoints: dataPoints
+    }]
+};
+var counter = 0;
+var limit = 15;
+function update_graph() {
+    if (counter > limit) {
+        dataPoints.push({x: counter, y: Math.random()});
+        dataPoints.shift();
+    } else {
+        dataPoints.push({x: counter, y: Math.random()});
+    }
+    counter++;
+    $("#chartContainer").CanvasJSChart(options);
+}
 
 var mytimer = setInterval(update_values, 500);
 var myupdate = setInterval(updateBar, 500);
+var prob_over_time = setInterval(update_graph,1000);
