@@ -10,6 +10,14 @@ import numpy as np
 import PIL.Image
 from PIL import ImageTk
 from tkinter import *
+from multiprocessing import Process, Value
+
+import pyaudio
+import audioop
+from collections import deque
+from google.cloud import speech
+from google.cloud.speech import enums
+from google.cloud.speech import types
 
 windowWidth = 800
 windowHeight = 600
@@ -128,19 +136,9 @@ class VeritasWindow(Frame):
         
         
     def update(self):
-        #mutex.acquire()
-        #if videoStream.tell() > 0:
-        #    #nextImg = ImageTk.PhotoImage(newImage)
-        #    nextImg = ImageTk.PhotoImage(PIL.Image.open(videoStream).resize((480,360)))
-        #    videoStream.seek(0)
-        #    videoStream.truncate()
-        #    self.videoPanel.configure(image=nextImg)
-        #    #self.videoPanel.image = ImageTk.PhotoImage(PIL.Image.open(videoStream))
-        #    #self.panel.image = ImageTk.PhotoImage(newImage)
-        #    self.videoPanel.image = nextImg
-        #mutex.release()
         if not emojiQueue.empty():
             qTuple = emojiQueue.get()
+            print(qTuple)
             index = int(qTuple[0])
             self.emoticonPanel.configure(image = emojis[index])
             self.emoticonPanel.image = emojis[index]
@@ -167,18 +165,97 @@ class SplitFrames(object):
                 self.stream.seek(0)
                 self.connection.write(self.stream.read(size))
                 self.count += 1
-                self.stream.seek(0)
-                #img = np.asarray(PIL.Image.open(self.stream))
-                #global newImg
-                #newImg = PIL.Image.open(self.stream)
-                #mutex.acquire()
-                #videoStream.seek(0)
-                #videoStream.write(self.stream.read(size))
-                #mutex.release()
-                #cv2.imshow("image", img)
-                #cv2.waitKey(1)
+                #print("sent frame #" + str(self.count) + " at time " + str(time.time()))
                 self.stream.seek(0)
         self.stream.write(buf)
+
+
+def getStrTime():
+    msTime = str(round(time.time() * 1000))
+    return msTime[-8:]
+
+
+def startSTT(end):
+    print("STT started")
+    form_1 = pyaudio.paInt16 # 16-bit resolution
+    chans = 1 # 1 channel
+    samp_rate = 44100 # 44.1kHz sampling rate
+    chunk = 4096 # 2^12 samples for buffer
+    record_secs = 3600 # seconds to record
+    dev_index = 2 # device index found by p.get_device_info_by_index(ii)
+
+    threshold = 15000
+    sliding_window = deque(maxlen=15)
+    
+    print("init finished")
+    
+    client = speech.SpeechClient()
+    send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    send_socket.connect(('10.18.243.213', 8002))
+    
+    print("speech client connected")
+    
+    audio = pyaudio.PyAudio() # create pyaudio instantiation
+    
+    # create pyaudio stream
+    stream = audio.open(format = form_1,rate = samp_rate,channels = chans, \
+                    input_device_index = dev_index, input = True, \
+                    frames_per_buffer=chunk)
+    print("recording")
+    
+    predata = deque(maxlen=10)
+
+    while end.value == 0:
+        frames = []
+        started = False
+        startTime = ""
+        # loop through stream and append audio chunks to frame array
+        for ii in range(0,int((samp_rate/chunk)*record_secs)):
+            data = stream.read(chunk, exception_on_overflow=False)
+            predata.append(data)
+            rms = audioop.rms(data, 2)
+            print(rms)
+            if rms > threshold and started is False:
+                started = True
+                startTime = getStrTime()
+                print('started')
+            if started:
+                frames.append(data)
+                sliding_window.append(rms)
+                if sum(ii < threshold for ii in sliding_window) >= 15:
+                    print("ending")
+                    break
+
+        print("finished recording")
+        
+        for i in range(len(predata)):
+            print('added a frame')
+            frames.insert(0, predata.pop())
+
+        audio = types.RecognitionAudio(content=b''.join(frames))
+        config = types.RecognitionConfig(
+            encoding=enums.RecognitionConfig.AudioEncoding.LINEAR16,
+            sample_rate_hertz=44100,
+            language_code='en-US')
+
+        response = client.recognize(config, audio)
+
+        for result in response.results:
+            myresult = result.alternatives[0].transcript
+            print('Transcript: {}'.format(myresult))
+            send_socket.send((startTime +";" + myresult).encode())
+            print("sent")
+
+        # send result to server
+        #send_socket.send((response.results[0].alternatives[0].transcript).encode())
+        #print("sent")
+        
+    # stop the stream, close it, and terminate the pyaudio instantiation
+    stream.stop_stream()
+    stream.close()
+    audio.terminate()
+
+    send_socket.close()
 
 
 def recv_process(sock):
@@ -190,109 +267,99 @@ def recv_process(sock):
     recv_connection = sock.accept()[0]
     print("created recv_connection")
     #response_stream = io.StringIO()
+    counter = 0
+    resultString = ""
     
     while True:
-        print("starting loop")
-        #response_len = struct.unpack('<L', recv_connection.read(struct.calcsize('<L')))[0]
-        #if not response_len:
-        #    print("invalid response_len, breaking")
-        #    break
         print("processing response...")
-             recvMessage = recv_connection.recv(128).decode()
-        print(recvMessage)
-        if recvMessage == "end_stream":
+        recvMessage = recv_connection.recv(1024).decode()
+        print("got message " + str(counter) + ": " + recvMessage + " at time " + str(time.time()))
+        counter += 1
+        if "end_stream" in recvMessage:
             break
-        if recvMessage == "unknown:":
-            emojiQueue.put(("8", "Unknown"))
-        else:
-            substrings = recvMessage.split(':')
-            emojiQueue.put((substrings[0], substrings[1]))
         
-        #response_stream.write(recv_connection.read(response_len))
-        #response_stream.seek(0)
-        #print(response_stream.read())
-        #response_stream.seek(0)
+        resultString += recvMessage
+        substrings = resultString.split(":")
+        total = len(substrings)
+        i = 0
+        while i + 2 <= total:
+            emojiQueue.put((substrings[i], substrings[i+1]))
+            i += 2
+        if total % 2 == 0:
+            resultString = substrings[total-2] + ":" + substrings[total-1] + ":"
+        else:
+            resultString = substrings[total-1]
+        
     recv_connection.close()
     print("recvconnection closed")
 
 
-root = Tk()
-root.geometry(str(windowWidth) + "x" + str(windowHeight))
-app = VeritasWindow(root)
-# root.mainloop()
+if __name__ == '__main__':
+    root = Tk()
+    root.geometry(str(windowWidth) + "x" + str(windowHeight))
+    app = VeritasWindow(root)
 
-while IPAddress is None:
-    root.update()
-else:
-    # Connect a client socket to my_server:8000 (change my_server to the
-    # hostname of your server)
-    print("client connecting on " + IPAddress)
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((IPAddress, 8000))
-    print("client connected!")
+    while IPAddress is None:
+        root.update()
+    else:
+        # Connect a client socket
+        print("client connecting on " + IPAddress)
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((IPAddress, 8000))
+        print("client connected!")
     
-    print("server waiting for connection...")
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_thread = threading.Thread(target=recv_process, args=(server_socket,))
-    server_thread.start()
-    #server_socket.bind(('0.0.0.0', 8001))
-    #server_socket.listen(0)
-    #connection = server_socket.accept()[0].makefile('rb')
-    #response_stream = io.StringIO()
+        print("server waiting for connection...")
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_thread = threading.Thread(target=recv_process, args=(server_socket,))
+        server_thread.start()
     
-    #response_len = struct.unpack('<L', connection.read(struct.calcsize('<L')))[0]
-    #if not response_len:
-    #    break
-    #
-    #response_stream.write(connection.read(response_len))
-    #response_stream.seek(0)
+        end = Value('i', 0)
+        STTThread = threading.Thread(target=startSTT, args=(end,))
+        STTThread.start()
+        print("started STT process") 
     
+        app.clearWidgets()
+        app.updateWindowGrid()
     
+        # Make a file-like object out of the connection
+        send_connection = client_socket.makefile('wb')
+        try:
+            output = SplitFrames(send_connection)
+            with picamera.PiCamera(resolution='VGA', framerate=60) as camera:
+                # Start a preview and let the camera warm up for 2 seconds
+                camera.hflip = True
+                camera.start_preview(fullscreen=False, window=(8,30,480,360))
+                time.sleep(2)
     
-    
-    
-    
-    app.clearWidgets()
-    app.updateWindowGrid()
-    
-    # Make a file-like object out of the connection
-    send_connection = client_socket.makefile('wb')
-    try:
-        output = SplitFrames(send_connection)
-        with picamera.PiCamera(resolution='VGA', framerate=90) as camera:
-            # Start a preview and let the camera warm up for 2 seconds
-            camera.start_preview(fullscreen=False, window=(8,30,480,360))
-            time.sleep(2)
-    
-            start = time.time()
-            camera.start_recording(output, format='mjpeg')
-            #camera.wait_recording(20)
-            while (time.time() - start < 180):
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-                app.update()
-                root.update()
+                start = time.time()
+                camera.start_recording(output, format='mjpeg')
+                #camera.wait_recording(20)
+                while (time.time() - start < 3600):
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+                    app.update()
+                    root.update()
             
-            print("out of time!")
-            camera.stop_recording()
+                print("out of time!")
+                camera.stop_recording()
             
-            # Write the terminating 0-length to the connection to let the
-            # server know we're done
-            send_connection.write(struct.pack('<L', 0))
-            send_connection.flush()
-            print("wrote end byte to server")
+                # Write the terminating 0-length to the connection to let the
+                # server know we're done
+                send_connection.write(struct.pack('<L', 0))
+                send_connection.flush()
+                print("wrote end byte to server")
         
-        finish = time.time()
-        print('Sent %d images in %d seconds at %.2ffps' % (
-        output.count, finish-start, output.count / (finish-start)))
-    finally:
-        print("waiting for server_thread")
-        server_thread.join()
-        print("server_thread joined")
-        server_socket.close()
-        print("server socket closed")
-        send_connection.close()
-        print("send_connection closed")
-        client_socket.close()
-        print("client socket closed")
-        app.exitWindow()
+            finish = time.time()
+            print('Sent %d images in %d seconds at %.2ffps' % (
+            output.count, finish-start, output.count / (finish-start)))
+        finally:
+            print("waiting for server_thread")
+            server_thread.join()
+            print("server_thread joined")
+            server_socket.close()
+            print("server socket closed")
+            send_connection.close()
+            print("send_connection closed")
+            client_socket.close()
+            print("client socket closed")
+            app.exitWindow()
