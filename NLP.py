@@ -78,7 +78,7 @@ def check_sentiment(sentence, text_len, lstm_model, word_index, data_classes):
 	probs = lstm_model.predict(output)
 	guess = np.argmax(probs, axis=-1)
 	result = data_classes[guess[0]]
-	return result
+	return result, probs[0][guess[0]]
 
 	
 def startNLP(NLPQueue, end):
@@ -110,10 +110,11 @@ def startNLP(NLPQueue, end):
 	while end.value == 0:
 		recv_msg = recv_conn.recv(512).decode()
 		#sentence = 'I feel I will fail the circuit exam on Friday'
-		timeSpeech = recv_msg.split(';')
+		timeSpeech = recv_msg.split(':')
 		if len(timeSpeech) > 1:
 			print("got message: " + timeSpeech[1])
-			result = check_sentiment(timeSpeech[1], text_len, lstm_model, word_index, data_classes)
+			result, prob = check_sentiment(timeSpeech[1], text_len, lstm_model, word_index, data_classes)
+			result += ":" + str(prob)
 			print(result)
 			NLPQueue.put((timeSpeech[0], result, timeSpeech[1]))
 

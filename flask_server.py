@@ -1,6 +1,7 @@
 from flask import Flask, render_template, Response, request, jsonify
 import server_t
 import threading
+from multiprocessing import Process
 import cv2
 import time
 import numpy as np
@@ -17,37 +18,40 @@ def index():
 		#counts = np.bincount(server_t.circBuffer, None, 8)
 		mybuffer = ""
 		counts = [0,0,0,0,0,0,0,0,0]
-		timeNLP=(0,"none", "none")
+		allcounts = [0,0,0,0,0,0,0,0,0]
+		timeNLP=(0,"none:0", "none")
 		if server_t.NLPQueue.qsize() > 0: # new NLP response
 			timeNLP = server_t.NLPQueue.get()
-			print("got NLP response")
+			print("got NLP response!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 			for item in server_t.circBuffer:
 				if abs(int(item[0]) - int(timeNLP[0])) < 3000:
 					mybuffer += str(item[1]) + ':'
-					print(mybuffer)
 				counts[item[1]] += 1
+				allcounts[item[1]] += 1
 		buffersize = max(sum(counts)-counts[8], 1)
+		allcountsSize = max(sum(allcounts), 1)
 				
 		print("my post response:")
 		print("useful emotions: " + mybuffer)
 		print("latest emotion: " + str(server_t.circBuffer[0][1]))
-		print("speech sentiment: " + timeNLP[1])
+		print("emotion confidence: " + str(server_t.circBuffer[0][2]) + "%")
+		print("speech sentiment: " + timeNLP[1].split(':')[0])
 		print("sentence: " + timeNLP[2])
 		return jsonify(circBuffer=mybuffer,
-					neutral=str(round(counts[0]/buffersize*100)) + "%", 
-					anger=str(round(counts[1]/buffersize*100)) + "%", 
-					contempt=str(round(counts[2]/buffersize*100)) + "%", 
-					disgust=str(round(counts[3]/buffersize*100)) + "%", 
-					fear=str(round(counts[4]/buffersize*100)) + "%", 
-					happy=str(round(counts[5]/buffersize*100)) + "%", 
-					sadness=str(round(counts[6]/buffersize*100)) + "%", 
-					surprise=str(round(counts[7]/buffersize*100)) + "%",
+					neutral=str(round(allcounts[0]/allcountsSize*100)) + "%", 
+					anger=str(round(allcounts[1]/allcountsSize*100)) + "%", 
+					contempt=str(round(allcounts[2]/allcountsSize*100)) + "%", 
+					disgust=str(round(allcounts[3]/allcountsSize*100)) + "%", 
+					fear=str(round(allcounts[4]/allcountsSize*100)) + "%", 
+					happy=str(round(allcounts[5]/allcountsSize*100)) + "%", 
+					sadness=str(round(allcounts[6]/allcountsSize*100)) + "%", 
+					surprise=str(round(allcounts[7]/allcountsSize*100)) + "%",
 					
 					latest_emo=str(server_t.circBuffer[0][1]),
-					emo_conf="30%",
+					emo_conf=str(server_t.circBuffer[0][2]) + "%",
 					
-					speech_senti=timeNLP[1],
-					speech_conf="50%",
+					speech_senti=timeNLP[1].split(':')[0],
+					speech_conf=timeNLP[1].split(':')[1],
 					sentence=timeNLP[2]
 					)
 		
@@ -74,5 +78,6 @@ def video_feed():
 
 if __name__ == '__main__':
 	server = threading.Thread(target=server_t.start_server)
+	#server = Process(target=server_t.start_server)
 	server.start()
 	app.run(host='0.0.0.0')

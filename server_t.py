@@ -20,17 +20,23 @@ from skimage import filters, feature
 import NLP
 
 
+ospath = "C:\Workspace\Veritas\Veritas"
 # load frontal face detector
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
 # load model
-model = tf.keras.models.load_model("all_model.h5")
+#model = tf.keras.models.load_model("all_model.tflite")
 print("Loaded model from disk")
 
+interpreter = tf.lite.Interpreter(model_path=os.path.join(ospath, "all_model.tflite"))
+interpreter.allocate_tensors()
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
 # compile loaded model
-model.compile(loss='sparse_categorical_crossentropy',
-			optimizer=tf.train.GradientDescentOptimizer(0.01),
-			metrics=['accuracy'])
+#model.compile(loss='sparse_categorical_crossentropy',
+#			optimizer=tf.train.GradientDescentOptimizer(0.01),
+#			metrics=['accuracy'])
 
 #print(model.summary())
 	
@@ -39,7 +45,7 @@ emotion = ['neutral', 'anger', 'contempt', 'disgust', 'fear', 'happy', 'sadness'
 sentiment = ['anger', 'disgust', 'fear', 'guilt', 'joy', 'sadness', 'shame']
 
 currentFrame = None
-circBuffer = np.zeros((150,2), dtype=int)
+circBuffer = np.zeros((150,3), dtype=int)
 NLPQueue = Queue()
 
 
@@ -88,14 +94,17 @@ def send_process(sock, endSend, resultQueue):
 			circBuffer = np.roll(circBuffer, 1, axis=0)
 			circBuffer[0][0] = result[0]
 			circBuffer[0][1] = int(result[1].split(':')[0])
+			print("split result = " + (result[1].split(':')[1])[:-1])
+			circBuffer[0][2] = float((result[1].split(':')[1])[:-1])
 			#print(circBuffer)
 			sock.send(result[1].encode())
 			#resultMutex.release()
 			print("sent frame " + str(counter) + ": " + result[1] + " at time = " + str(time.time()))
 			counter += 1
 			#newInfo = False
+			
 	
-def assignJob(imgQueue, resultQueue, imgMutex, faceQueue, end, framesTaken, framesProcessed, frame_num, threadNum):
+def assignJob(imgQueue, resultQueue, imgMutex, faceQueue, end, framesProcessed, frame_num, threadNum):
 	#while endSend is False or imgQueue.empty() is False:
 	while end.value == 0 or imgQueue.empty() is False:
 	#if imgQueue.empty() is False:
@@ -124,7 +133,6 @@ def assignJob(imgQueue, resultQueue, imgMutex, faceQueue, end, framesTaken, fram
 		else:
 			timeImg = imgQueue.get()
 			imgMutex.release()
-			framesTaken.value += 1
 				
 			face = processImg(timeImg[1])
 			print("processed frame " + str(framesProcessed.value) + " at time = " + str(time.time()))
@@ -156,7 +164,7 @@ def processImg(img):
 			else:
 				s = h
 			crop = img[y:y+s, x:x+s]
-			gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+			gray = cv2.cvtColor(crop, cv2.COLOR_RGB2GRAY)
 			#gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
 			#face[person] = cv2.resize(gray, (96, 96))
 			face = cv2.resize(gray, (96, 96))
@@ -169,8 +177,9 @@ def processImg(img):
 	return None
 
 	
-def predictImg(faceQueue, resultQueue, frame_num, end):
+def predictImg(faceQueue, faceMutex, resultQueue, frame_num, end):
 	while end.value == 0:
+		faceMutex.acquire()
 		if faceQueue.qsize() >= frame_num:
 			faces = np.zeros((frame_num, 96, 96, 1))
 			timestamp = 0
@@ -178,6 +187,7 @@ def predictImg(faceQueue, resultQueue, frame_num, end):
 			for i in range(frame_num):
 				timeFace = faceQueue.get()
 				faces[i] = timeFace[1]
+			faceMutex.release()
 			timestamp = timeFace[0]
 			
 			if len(faces) == 0:
@@ -185,9 +195,24 @@ def predictImg(faceQueue, resultQueue, frame_num, end):
 				continue
 			
 			#faces = np.array(faces)
+			predicted_prob = np.zeros((2, 8))
 			
-			predicted_prob = model.predict(faces)  # predict
+			#input_data = faces[0][tf.newaxis, ...]
+			for i in range(2):
+				input_data = np.array(faces[i*5][tf.newaxis,...], dtype=np.float32)
+				#print(input_data.shape)
+				#print(input_data)
+				interpreter.set_tensor(input_details[0]['index'], input_data)
+				interpreter.invoke()
+				prob = interpreter.get_tensor(output_details[0]['index'])
+				#print(prob)
+				predicted_prob[i] = prob
+			
+			
+			##predicted_prob = model.predict(faces)  # predict
 			#print("predicted_prob:")
+			#for p in predicted_prob:
+				#p[0] *= 0.85
 			#print(predicted_prob)
 			predictions = predicted_prob.argmax(axis=-1)
 			# get most common emotion
@@ -200,11 +225,13 @@ def predictImg(faceQueue, resultQueue, frame_num, end):
 			avg_conf /= float(predicted_prob.shape[0])
 			conf_level = round(avg_conf * 100, 2)
 			# update result
-			result = "8::"
+			result = "8:0%:"
 			if conf_level > 20:
 				result = str(most_common) + ":" + str(conf_level) + "%:"
 			resultQueue.put((timestamp, result))
-			print("prediction result: " + emotion[most_common])
+			print("prediction result: " + emotion[most_common] + ", time lag = " + str(int(getStrTime()) - int(timestamp)))
+		else:
+			faceMutex.release()
 	print("predictImg thread ending")
 
 	
@@ -228,12 +255,13 @@ def start_server():
 	imgQueue = Queue()
 	imgMutex = Lock()
 	faceQueue = Queue()
+	faceMutex = Lock()
 	resultQueue = Queue()
 	#NLPQueue = Queue()
 	end = Value('i', 0)
 	framesTaken = Value('i', 0)
 	framesProcessed = Value('i', 0)
-	frame_num = 6
+	frame_num = 10
 
 
 	#predictor_path = 'shape_predictor_68_face_landmarks.dat'
@@ -241,14 +269,16 @@ def start_server():
 	#predictor = dlib.shape_predictor(predictor_path)
 
 	workerProcesses = []
-	for i in range(6):
-		workerProcesses.append(Process(target=assignJob, args=(imgQueue, resultQueue, imgMutex, faceQueue, end, framesTaken, framesProcessed, frame_num, i)))
+	for i in range(int(frame_num/2)):
+		workerProcesses.append(Process(target=assignJob, args=(imgQueue, resultQueue, imgMutex, faceQueue, end, framesProcessed, frame_num, i)))
 		workerProcesses[i].start()
 		print("started workers")
-		
-	predictProcess = Process(target=predictImg, args=(faceQueue, resultQueue, frame_num, end))
-	predictProcess.start()
-	print("started predict image process")
+	
+	predictProcesses = []
+	for i in range(5):
+		predictProcesses.append(Process(target=predictImg, args=(faceQueue, faceMutex, resultQueue, frame_num, end)))
+		predictProcesses[i].start()
+		print("started predict image process")
 	
 	NLPProcess = Process(target=NLP.startNLP, args=(NLPQueue, end))
 	NLPProcess.start()
@@ -316,7 +346,8 @@ def start_server():
 			imgQueue.put((getStrTime(), img))
 			
 			global currentFrame
-			currentFrame = img[:,:,::-1]
+			#currentFrame = img[:,:,::-1]
+			currentFrame = img[:,:,:]
 	
 			#for _, d in enumerate(faces):
 			#    # d is array of two corner coordinates for face bounding box
@@ -344,9 +375,14 @@ def start_server():
 	finally:
 		for worker in workerProcesses:
 			worker.join()
-		predictProcess.join()
+		for worker in predictProcesses:
+			worker.join()
 		NLPProcess.join()
 		clientThread.join()
 		recv_connection.close()
 		server_socket.close()
 		cv2.destroyAllWindows()
+		
+		
+if __name__ == '__main__':
+	start_server()
